@@ -1,11 +1,11 @@
 # 审计报告：dsh-chatgpt-subscription
 
 日期：2026-08-20
-范围：OAuth 绑定、ChatGPT 路由、默认模型、凭据生命周期、搜索隔离、RPC 安全、客户端轮询、发布产物与依赖。
+范围：OAuth 绑定、ChatGPT 路由、默认模型、凭据生命周期、RPC 安全、客户端轮询、发布产物与依赖。
 
 ## 结论
 
-本轮代码修复已完成，自动化验收通过；插件把默认模型和搜索线路作为一个模式同步：ChatGPT 模式的 DeepSeek 搜索 fail closed，DeepSeek 模式恢复原搜索引用。用户明确选择的旧会话模型、视觉工具和子代理仍由 DSH 各自管理，插件不伪造 ChatGPT 未提供的能力。
+本轮代码修复已完成，自动化验收通过。插件回归「纯订阅绑定」定位：只负责 OAuth 绑定、令牌看护与 `openai-codex` 模型路由，**不管理联网搜索配置**——搜索商由用户在 DSH 配置层自行指定，插件从不读取、改写或切换搜索设置。用户明确选择的旧会话模型、视觉工具和子代理仍由 DSH 各自管理，插件不伪造 ChatGPT 未提供的能力。
 
 ## 功能验收
 
@@ -17,18 +17,18 @@
 | 解绑与失效收敛 | ✅ | 清理插件注入凭据；解绑清理插件拥有的路由；默认选择按条件恢复 |
 | 文件安全 | ✅ | auth/bind 原子写入并显式 0600；插件数据目录按 0700 创建 |
 | 并发与状态 | ✅ | 同步单飞，OAuth 注入失败不再显示健康成功 |
-| 搜索隔离 | ✅ | provider 保持挂载；ChatGPT 模式切到不存在的凭据引用而 fail closed，DeepSeek 模式恢复原引用 |
+| 搜索配置用户自管 | ✅ | 插件不触碰任何搜索设置；静态断言验证无 `SEARCH_SETTINGS_NAMESPACE` / `setSearchMode`，不读取、删除或记录搜索密钥 |
 | RPC 安全 | ✅ | 有副作用的方法只允许 POST，并要求严格 same-origin |
 | 客户端稳定性 | ✅ | RPC 15 秒超时、HTTP 状态检查、授权轮询错误和卸载清理 |
 | 产物与依赖 | ✅ | `lib/` 由 build 生成；已加入 package-lock，CI 使用 npm ci、audit 和产物一致性检查 |
 
 ## 测试结果
 
-- `npm test`：**74 PASS / 0 FAIL**
+- `npm test`：**70 PASS / 0 FAIL**
 - `npm run build`：成功
 - `npm audit --omit=dev --audit-level=high`：0 vulnerabilities
 - `git diff --check`：通过
-- `dsh --profile web --dump-config`：确认 `web-search-deepseek` 保持挂载，运行时由插件切换凭据引用
+- `dsh --profile web --dump-config`：确认 `dsh-chatgpt-subscription` 挂载，插件行不含任何搜索配置引用
 
 ## 安全检查
 

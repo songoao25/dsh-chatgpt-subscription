@@ -2,6 +2,26 @@
 
 本项目的版本记录遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.0] - 2026-08-20
+
+> 用户拍板：移除插件的「搜索模式管理」，回归纯订阅绑定定位。插件不再自动切换搜索线路，搜索商完全由用户在 DSH 配置层自行指定（如 DeepSeek 搜索或第三方搜索服务）。
+
+### Removed
+
+- **搜索模式管理**：删除 `setSearchMode` / `syncRoutingMode` 及配套常量、状态与绑定标记字段（`searchModeManaged` / `previousSearchKeyRef`）；绑定、解绑、插件停用均不再读取、改写或切换任何搜索配置（不再改动 `web-search-deepseek` 设置的凭据引用）
+- **3 秒搜索线路轮询**：`ROUTING_SYNC_INTERVAL_MS` 周期同步任务随搜索管理一并移除
+
+### Changed
+
+- **搜索商由用户自管**：`searchProvider`（如 `deepseek-official` / `exa`）由用户在 DSH profile 配置层单独配置；插件只负责 ChatGPT 订阅 OAuth 绑定、令牌看护与 `openai-codex` 模型路由，不干预联网搜索
+- **客户端说明文案**：设置页「订阅」说明更新为「本插件不管理联网搜索配置」
+- **文档同步**：INSTALL / 技术设计 / 产品定义 / 审计文档改写为搜索自管模型；`cordis.patch.yml` 注释同步
+- **测试更新**：删除 5 条搜索管理断言，新增「host 不管理搜索配置」断言，共 70 项全部通过
+
+### Security
+
+- ChatGPT 订阅令牌仍绝不会被当作搜索凭据使用（不变量保持不变）；插件不读取、不删除、不记录任何搜索密钥值
+
 ## [0.1.0] - 2026-08-17
 
 > 首个可分发版本：ChatGPT 订阅官方 OAuth 绑定插件。本版本完成从「读本机 codex CLI 登录态」旧桥接方式到「官方 OAuth 授权」的完整迁移（用户拍板废弃旧方式），并修复复制底稿残留的插件 id 与缺失 scope 参数问题。

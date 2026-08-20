@@ -66,14 +66,11 @@ dsh plugin --profile web remove dsh-chatgpt-subscription
 
 卸载会清理：profile 插件条目、`llm-pi-ai.providers.openai-codex` 路由配置、`OPENAI_CODEX_API_KEY` 凭据、绑定标记目录。**保留** `~/.codex/auth.json`（codex CLI 自己的登录态）。重启后模型切换器的 ChatGPT 提供商自动消失。
 
-## 搜索隔离（重要）
+## 与联网搜索的关系
 
-插件不会把 ChatGPT 订阅令牌当作搜索服务凭据，也不会读取、删除或记录 `DEEPSEEK_API_KEY` 的值。线路会随默认模型选择同步：
+插件**不管理联网搜索**：不会把 ChatGPT 订阅令牌当作搜索服务凭据，也不会读取、删除、记录或改写任何搜索配置（如 `DEEPSEEK_API_KEY`、`EXA_API_KEY`）。
 
-- 选择 ChatGPT：DeepSeek 搜索 provider 保持挂载但使用不存在的凭据引用，`web_search` 明确失败，不会调用 DeepSeek。
-- 选择 DeepSeek：恢复原来的 `DEEPSEEK_API_KEY` 引用，DeepSeek 搜索恢复。
-
-插件只保存并恢复搜索配置中的凭据引用，不保存 DeepSeek 密钥。模型切换器没有宿主事件时，插件每 3 秒检查一次默认选择；旧会话中明确选定的模型不被偷偷改写。
+搜索商（`searchProvider`，如 `deepseek-official` / `exa`）完全由用户在 DSH 的 profile 配置层自行指定；本插件无论绑定与否、处于哪个模型模式，都不触碰搜索设置。若未配置任何可用搜索商，`web_search` 会按 DSH 自身的规则明确失败，这与本插件无关。
 
 ## 故障排查
 
