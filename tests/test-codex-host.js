@@ -236,6 +236,7 @@ function makeJwt(claims) {
   check('host 解绑移除自有路由', src.includes("path: ['providers', 'openai-codex'] }]"), true)
   check('host 不删除用户已有 Codex 路由', src.includes('同名用户路由只读不删不改'), true)
   check('host 只清理自有 Codex 凭据', src.includes('codexCredentialOwned') && src.includes('credentialManaged'), true)
+  check('host 覆盖前检查已有 Codex 凭据', src.includes('canClaimCodexCredential') && src.includes('credentials-conflict'), true)
   check('host 失效状态清理 Codex 凭据', (src.match(/clearInjectedCodexCredential\(flag\)/g) || []).length >= 4, true)
   check('OAuth 启动 RPC 受同源保护', src.includes('MUTATING = { startCodexOAuth: true'), true)
   check('ChatGPT 默认模型使用明确配置', src.includes('CODEX_DEFAULT_MODEL'), true)

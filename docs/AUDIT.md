@@ -24,7 +24,7 @@
 
 ## 测试结果
 
-- `npm test`：**73 PASS / 0 FAIL**
+- `npm test`：**74 PASS / 0 FAIL**
 - `npm run build`：成功
 - `npm audit --omit=dev --audit-level=high`：0 vulnerabilities
 - `git diff --check`：通过
