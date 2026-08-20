@@ -1,70 +1,57 @@
 # 审计报告：dsh-chatgpt-subscription
 
-日期：2026-08-17
-审计范围：commit 818648f（host 绑定流程）+ 78de57b（client 设置页）+ 8fd3bfc（修复 OAUTH_SCOPE/插件 id/测试）+ debad65（发布文件）
-流程：开发 → QA（功能对照验收）→ 安全审计（独立视角）→ 修复 → 回归
-说明：按流水线要求本应由独立子 Agent 担任 QA/审计，但后台子 Agent 在本环境多次零产出失败（与既有记录一致），改由主 Agent 以独立审计者视角完成（不预设代码正确，逐条找问题）；审计视角与开发视角分离。
+日期：2026-08-20
+范围：OAuth 绑定、ChatGPT 路由、默认模型、凭据生命周期、搜索隔离、RPC 安全、客户端轮询、发布产物与依赖。
 
-## 一、功能验收（对照设计与源码逐条核对）
+## 结论
 
-| # | 验收项 | 结果 | 证据 |
-|---|---|---|---|
-| 1 | OAuth 绑定流程完整（PKCE/state/回调/交换/写回/标记/注入） | ✅ | host.js:172-177（PKCE S256）、307-351（回调服务 127.0.0.1 + state 校验 + 超时）、277-304（令牌交换）、522-566（流程状态机） |
-| 2 | 严格官方模式：绑定标记唯一事实；CLI 登录态不被自动使用 | ✅ | readBindFlag/writeBindFlag（23-58）；syncCodexTokenOnce 432-435 无标记即 unbound；unbind 只清标记 |
-| 3 | 令牌看护：启动即刷 + 30min 周期 + JWT 过期判定 + 自动续期 | ✅ | 60-64（周期常量）、428-497（syncCodexTokenOnce 全流程）、455-484（续期分支含并发读回防护） |
-| 4 | openai-codex 路由注册（displayName=ChatGPT, transport=sse）+ 自我升级 | ✅ | 382-417（ensureCodexRoute；只升级 displayName/transport，用户自定义 apiKeyEnv 不覆盖） |
-| 5 | RPC 契约与错误格式 | ✅ | 616-620（三个 RPC）、错误统一 {ok:false,error:{kind,message}} 且静态文案 |
-| 6 | 同源防护 + body 上限 | ✅ | 621-629（sameOrigin 校验 Origin/Sec-Fetch-Site）、631-639（64KB 上限 413） |
-| 7 | client 设置页（settings.section 注册/授权/轮询/解绑） | ✅ | client-bundle.js 141-146（注册 id=chatgpt-subscription order=25）；插槽契约经 DSH 源码确认（dsh-client-ui-settings invariant） |
-| 8 | 安全静态：无 token 打印/无个人路径/无硬编码密钥/env 前缀正确 | ✅ | 见「三、安全检查」 |
-| 9 | 测试覆盖（49 断言全绿，零真实网络/零真实 auth.json） | ✅ | tests/test-codex-host.js；覆盖 JWT/过期/绑定标记/auth 读写/PKCE/URL/回调/account_id/auth 对象构造/安全静态 |
-| 10 | 发布文件完整（16 项标准文件 + 安装卸载脚本 + CI） | ✅ | 见「四、发布文件」 |
+本轮代码修复已完成，自动化验收通过；插件把默认模型和搜索线路作为一个模式同步：ChatGPT 模式的 DeepSeek 搜索 fail closed，DeepSeek 模式恢复原搜索引用。用户明确选择的旧会话模型、视觉工具和子代理仍由 DSH 各自管理，插件不伪造 ChatGPT 未提供的能力。
 
-## 二、审计发现并已修复的问题
+## 功能验收
 
-| # | 问题 | 严重度 | 修复 |
-|---|---|---|---|
-| 1 | **client 获取 React 方式错误**：`var React = window.React`——DSH 客户端环境无 `window.React` 全局（官方 client 包与已发布插件均用 `require('react')`，由 seed 模块提供）；会导致设置页一打开即崩溃、「订阅」页完全无法渲染 | **高**（功能不可用） | 改为 `require('react')`（与官方机制一致） |
-| 2 | **缺失 `OAUTH_SCOPE` 常量**：`buildAuthorizeUrl` 引用未定义变量，点授权时 ReferenceError 卡死 | **高**（功能不可用） | 补上 `openid profile email offline_access` |
-| 3 | **插件 id 残留**：cordis.patch.yml 与 client 模块 id 为 `dsh-bottom-info-bar`（复制底稿残留），会导致挂载/加载错误 | **高**（无法安装） | 统一改为 `dsh-chatgpt-subscription` |
-| 4 | 测试提取器无法解析兄弟函数引用（decodeJwtExp→decodeBase64Url） | 中（测试基础设施） | 共享作用域整体求值 |
-| 5 | 测试覆盖缺口：`codexAccountIdFromJwt`/`buildOAuthAuthObject` 无断言 | 低 | 补 13 断言（测试 36→49） |
-| 6 | package.json `test` 脚本路径错误（`../tests/`） | 低 | 改为 `node tests/run-all.mjs` |
-| 7 | .gitignore 陈旧 `plugin/lib/` 条目 | 低 | 移除 |
+| 需求 | 结果 | 说明 |
+|---|---|---|
+| OAuth PKCE/state/本地回调 | ✅ | 回调仅监听 127.0.0.1，校验 state，令牌端点使用 HTTPS |
+| ChatGPT 路由注册 | ✅ | 仅使用 `OPENAI_CODEX_API_KEY`；同名自定义路由不覆盖并明确报错 |
+| 绑定后默认模型 | ✅ | 保存旧选择，切换到 `openai-codex / gpt-5.6-luna`；可用环境变量覆盖模型名 |
+| 解绑与失效收敛 | ✅ | 清理插件注入凭据；解绑清理插件拥有的路由；默认选择按条件恢复 |
+| 文件安全 | ✅ | auth/bind 原子写入并显式 0600；插件数据目录按 0700 创建 |
+| 并发与状态 | ✅ | 同步单飞，OAuth 注入失败不再显示健康成功 |
+| 搜索隔离 | ✅ | provider 保持挂载；ChatGPT 模式切到不存在的凭据引用而 fail closed，DeepSeek 模式恢复原引用 |
+| RPC 安全 | ✅ | 有副作用的方法只允许 POST，并要求严格 same-origin |
+| 客户端稳定性 | ✅ | RPC 15 秒超时、HTTP 状态检查、授权轮询错误和卸载清理 |
+| 产物与依赖 | ✅ | `lib/` 由 build 生成；已加入 package-lock，CI 使用 npm ci、audit 和产物一致性检查 |
 
-## 三、安全检查（独立审计者逐条核查）
+## 测试结果
 
-- [x] **令牌传输**：仅 HTTPS 到 auth.openai.com / chatgpt.com（fetch，无子进程、无 shell 注入面）；错误信息不含 token
-- [x] **令牌落盘**：全部 0600 + tmp+rename 原子写（绑定标记 46、auth.json 写回 132、解绑 271 三处）；不打印、不进日志、不进 git 历史
-- [x] **console 审计**：仅 3 处 console.warn（路由注册/升级失败），无 token 值
-- [x] **OAuth 安全**：PKCE S256（verifier 32 字节随机、用后即弃）、state 随机 + 回调校验（防 CSRF/登录注入）、回调服务仅 127.0.0.1、5 分钟超时、client_id 为公开常量
-- [x] **RPC/HTTP 面**：修改类（unbindCodex）同源校验（Origin/Sec-Fetch-Site）；只读状态接口泄露面低（仅绑定状态/过期时间，无 token）；64KB body 上限；未知 method 404；decodeURIComponent 异常被外层 try-catch 兜底
-- [x] **注入面**：openOAuthBrowser 的 URL 经 `["$`\\]` 转义且 URL 为模块内构造（无用户输入）；settings.mutate 仅操作 openai-codex 白名单路径
-- [x] **XSS**：client 全 React.createElement 默认转义，无 dangerouslySetInnerHTML；回调页 message 全 HTML 转义
-- [x] **供应链**：零运行时依赖（仅 react peer）；build 仅本地拼接，无外部下载
-- [x] **卸载安全**：uninstall.sh + purge-codex.py 幂等、settings.yaml 修改前备份、原子重写保留权限、绝不触碰 ~/.codex/auth.json
-- [x] **仓库卫生**：git 全历史 4 commit 扫描——零 sk- 密钥、零私钥块、零个人路径、零疑似 token 值；.gitignore 正确（lib/ 为已提交构建产物，符合项目约定）
-- [x] **凭据键名**：OPENAI_CODEX_API_KEY / DSH_CHATGPT_* 前缀隔离，无碰撞
+- `npm test`：**73 PASS / 0 FAIL**
+- `npm run build`：成功
+- `npm audit --omit=dev --audit-level=high`：0 vulnerabilities
+- `git diff --check`：通过
+- `dsh --profile web --dump-config`：确认 `web-search-deepseek` 保持挂载，运行时由插件切换凭据引用
 
-## 四、发布文件清单（16 项全绿）
+## 安全检查
 
-README.md / README.zh-CN.md（双语 + 徽章 + 语言切换）/ LICENSE（MIT songoao25）/ CHANGELOG.md / .gitignore / CONTRIBUTING.md / CODE_OF_CONDUCT.md / SECURITY.md / SUPPORT.md / .gitattributes / .editorconfig / AGENTS.md / .github/workflows/ci.yml / .github/dependabot.yml / install.sh / uninstall.sh + scripts/purge-codex.py + docs/INSTALL.md
+- [x] 源码、构建产物、Git 历史未发现真实密钥或 token 日志
+- [x] OAuth 回调 state + PKCE + 127.0.0.1
+- [x] start OAuth / unbind RPC 严格 same-origin 且仅 POST
+- [x] 令牌不进入错误消息、日志或 RPC 返回
+- [x] 只清理插件自己注入的凭据和自己创建的路由，不删除用户已有同名配置
+- [x] auth/bind 文件原子写入和 0600
+- [x] 卸载脚本拒绝删除默认插件目录之外的路径
+- [x] 依赖锁定并完成运行时依赖审计
 
-## 五、测试结果
+## 用户侧必须处理
 
-- `node tests/run-all.mjs`：**49 PASS / 0 FAIL**
-- `npm run build`：成功（lib/index.js + lib/client.js）
-- ESM 加载验证：`import lib from './lib/index.js'` → apply=function, inject=["credentials","settings","timer","shell"]
+1. 已经出现在本机凭据文件中的 DeepSeek、OpenCode、OpenAI/Codex 凭据应在对应服务后台撤销并重新生成；插件不能替用户撤销远端密钥。
+2. 如果此前运行过旧版本，必须重启 DSH；旧进程内存中的路由不会自动消失。
+3. 视觉工具当前是独立线路，不会自动改成 ChatGPT；若不想产生其他模型费用，应在 DSH 设置中关闭或单独更换视觉 provider。
+4. 旧会话和手动选中的 DeepSeek 模型仍可能调用 DeepSeek；这是显式用户选择，不是插件暗中回退。
 
-## 六、遗留低危项（不影响发布，记录在案）
+## 遗留边界
 
-| 问题 | 处理 |
-|---|---|
-| 真实端到端 OAuth 授权未实测（需用户真实 ChatGPT 账号授权一次） | 发布后由用户完成首次绑定即自然验证 |
-| refresh_token 续期分支未真实触发（逻辑覆盖，access_token 本次有效） | 遇 401 时自然验证 |
-| getCodexBridgeStatus 为只读但跨站可查绑定状态（无 token 泄露） | 泄露面极低，接受 |
-| order=25 的具体排序表现需真实 UI 确认 | 发布后用户可见即验证 |
-
-## 七、结论
-
-**达到可发布状态。** 功能验收 10/10，测试 49 断言全绿，安全审计通过（高危 2 项均已修复并回归，中/低危均已处理或记录），发布文件 16 项齐全。遗留项均为发布后自然验证类，不阻塞发布。
+| 问题 | 严重度 | 处理 |
+|---|---:|---|
+| ChatGPT OAuth 真实账号端到端授权未在自动化环境执行 | 中 | 用户重启后完成一次真实授权验证 |
+| ChatGPT 订阅额度与 token 用量不能由插件独立精确计价 | 中 | 额度展示交给配套信息栏；插件不伪造价格或额度 |
+| ChatGPT 视觉、旧会话、显式 DeepSeek 路由不受插件强制接管 | 中 | 在设置和文档中明确线路边界 |

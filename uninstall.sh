@@ -34,7 +34,16 @@ else
 fi
 
 echo "==> 清理绑定标记目录（~/.dsh/dsh-chatgpt-subscription/）"
-rm -rf "${DSH_CHATGPT_DATA_DIR:-$HOME/.dsh/dsh-chatgpt-subscription}"
+DATA_DIR="${DSH_CHATGPT_DATA_DIR:-$HOME/.dsh/dsh-chatgpt-subscription}"
+DEFAULT_DATA_DIR="$HOME/.dsh/dsh-chatgpt-subscription"
+case "$DATA_DIR" in
+  "$DEFAULT_DATA_DIR"|"$DEFAULT_DATA_DIR"/*) ;;
+  *) echo "错误：拒绝删除不在默认插件目录内的 DSH_CHATGPT_DATA_DIR：$DATA_DIR"; exit 1 ;;
+esac
+if [[ "$DATA_DIR" == "/" || "$DATA_DIR" == "$HOME" || -z "$DATA_DIR" ]]; then
+  echo "错误：拒绝删除危险路径"; exit 1
+fi
+rm -rf -- "$DATA_DIR"
 
 echo
 echo "✔ 卸载完成。"

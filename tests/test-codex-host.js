@@ -1,7 +1,7 @@
 // dsh-chatgpt-subscription — host 端纯函数与状态机测试（注入式，零真实网络/零真实 auth.json）
 // 提取 host.js 模块级常量与纯函数（将「常量 + 纯函数」作为一个共享作用域整体求值，
 // 使函数能解析到同模块内的兄弟函数与常量——如 decodeJwtExp 调 decodeBase64Url、buildAuthorizeUrl 用 OAUTH_SCOPE）
-import { readFileSync, writeFileSync, renameSync, mkdirSync, unlinkSync, rmSync } from 'node:fs'
+import { chmodSync, readFileSync, writeFileSync, renameSync, mkdirSync, unlinkSync, rmSync, statSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
@@ -9,6 +9,8 @@ import { createHash, randomBytes } from 'node:crypto'
 
 const root = dirname(fileURLToPath(new URL('../package.json', import.meta.url)))
 const src = readFileSync(join(root, 'src', 'host.js'), 'utf8')
+const clientSrc = readFileSync(join(root, 'src', 'client-bundle.js'), 'utf8')
+const patchSrc = readFileSync(join(root, 'cordis.patch.yml'), 'utf8')
 
 // ---- 简易断言（脱敏：涉及 token/auth/secret 的断言失败时不打印实际值）----
 let pass = 0
@@ -64,7 +66,7 @@ function extractModule(nameList, depOverrides) {
   // AbortSignal/fetch），fs/crypto/path 是 import（非全局），必须按原裸名注入到 new Function 作用域。
   const params = [
     'createHash', 'randomBytes',
-    'readFileSync', 'writeFileSync', 'renameSync', 'mkdirSync', 'unlinkSync',
+    'readFileSync', 'writeFileSync', 'renameSync', 'mkdirSync', 'unlinkSync', 'chmodSync',
     'createServer', 'homedir', 'dirname',
   ]
   const factory = new Function(
@@ -73,12 +75,12 @@ function extractModule(nameList, depOverrides) {
   )
   const dep = Object.assign({
     createHash, randomBytes,
-    readFileSync, writeFileSync, renameSync, mkdirSync, unlinkSync,
+    readFileSync, writeFileSync, renameSync, mkdirSync, unlinkSync, chmodSync,
     createServer: null, homedir: null, dirname,
   }, depOverrides || {})
   return factory(
     dep.createHash, dep.randomBytes,
-    dep.readFileSync, dep.writeFileSync, dep.renameSync, dep.mkdirSync, dep.unlinkSync,
+    dep.readFileSync, dep.writeFileSync, dep.renameSync, dep.mkdirSync, dep.unlinkSync, dep.chmodSync,
     dep.createServer, dep.homedir, dep.dirname,
   )
 }
@@ -88,14 +90,14 @@ const fnNames = [
   'decodeBase64Url', 'decodeJwtExp', 'codexExpiresAt', 'codexNeedsRefresh',
   'readCodexAuthFile', 'writeAuthJson', 'readBindFlag', 'writeBindFlag', 'clearBindFlag',
   'createPkcePair', 'buildAuthorizeUrl', 'parseCallbackUrl', 'oauthCallbackPort',
-  'codexAccountIdFromJwt', 'buildOAuthAuthObject',
+  'codexAccountIdFromJwt', 'buildOAuthAuthObject', 'routingModeFor',
 ]
 const mod = extractModule(fnNames)
 const {
   decodeBase64Url, decodeJwtExp, codexExpiresAt, codexNeedsRefresh,
   readCodexAuthFile, writeAuthJson, readBindFlag, writeBindFlag, clearBindFlag,
   createPkcePair, buildAuthorizeUrl, parseCallbackUrl, oauthCallbackPort,
-  codexAccountIdFromJwt, buildOAuthAuthObject,
+  codexAccountIdFromJwt, buildOAuthAuthObject, routingModeFor,
 } = mod
 
 // 环境变量隔离（测试前设置）
@@ -131,6 +133,14 @@ function makeJwt(claims) {
   check('codexNeedsRefresh 充足(1d) → false', codexNeedsRefresh(now + 86400, now), false)
 }
 
+// ---- 测试 2b：模式路由判定 ----
+{
+  check('健康绑定 + ChatGPT → ChatGPT 模式', routingModeFor(true, true, 'openai-codex'), 'chatgpt')
+  check('健康绑定 + DeepSeek → DeepSeek 模式', routingModeFor(true, true, 'deepseek-official'), 'deepseek')
+  check('令牌失效 + ChatGPT 选择 → DeepSeek 模式', routingModeFor(true, false, 'openai-codex'), 'deepseek')
+  check('未绑定 + ChatGPT 选择 → DeepSeek 模式', routingModeFor(false, true, 'openai-codex'), 'deepseek')
+}
+
 // ---- 测试 3：绑定标记 ----
 {
   const file = process.env.DSH_CHATGPT_BIND_FILE
@@ -139,6 +149,7 @@ function makeJwt(claims) {
   writeBindFlag(file, { plan: 'plus' })
   const f = readBindFlag(file)
   check('readBindFlag 写后 → bound true', f.bound, true)
+  check('writeBindFlag 权限为 0600', statSync(file).mode & 0o777, 0o600)
   // readBindFlag 契约只返回 { ok, bound }；扩展字段（plan 等）写入文件保留（供外部读取），不参与读回
   const rawFlag = JSON.parse(readFileSync(file, 'utf8'))
   check('readBindFlag 扩展字段写入文件', rawFlag.plan, 'plus')
@@ -160,6 +171,7 @@ function makeJwt(claims) {
   check('writeAuthJson 保留 account_id', r2.auth.tokens.account_id, 'acc-id')
   check('writeAuthJson 保留 auth_mode', r2.auth.auth_mode, 'oauth')
   check('writeAuthJson last_refresh 更新', r2.auth.last_refresh, '2026-08-16T00:00:00.000Z')
+  check('writeAuthJson 权限为 0600', statSync(file).mode & 0o777, 0o600)
 }
 
 // ---- 测试 5：PKCE / 授权 URL / 回调解析 ----
@@ -202,9 +214,9 @@ function makeJwt(claims) {
   check('buildOAuthAuthObject last_refresh', built.last_refresh, nowIso)
 
   // 已有结构保留 + refresh 缺失不覆盖旧值
-  const existing = { auth_mode: 'oauth', OPENAI_API_KEY: 'sk-old', tokens: { account_id: 'acc-old', refresh_token: 'ref-old' }, last_refresh: '2026-08-01T00:00:00.000Z' }
+  const existing = { auth_mode: 'oauth', OPENAI_API_KEY: 'fake-openai-key', tokens: { account_id: 'acc-old', refresh_token: 'ref-old' }, last_refresh: '2026-08-01T00:00:00.000Z' }
   const built2 = buildOAuthAuthObject(existing, { access_token: jwt, refresh_token: null, id_token: null }, nowIso)
-  check('buildOAuthAuthObject 保留 OPENAI_API_KEY', built2.OPENAI_API_KEY, 'sk-old')
+  check('buildOAuthAuthObject 保留 OPENAI_API_KEY', built2.OPENAI_API_KEY, 'fake-openai-key')
   check('buildOAuthAuthObject refresh 缺失保留旧值', built2.tokens.refresh_token, 'ref-old')
   check('buildOAuthAuthObject account_id 更新为新', built2.tokens.account_id, 'acc-123')
 }
@@ -213,8 +225,26 @@ function makeJwt(claims) {
 {
   check('host 源码无 token 打印', /console\.(log|warn|error)[^;]*(token|access_token|refresh_token|Authorization|Bearer)/.test(src), false)
   check('host 源码无 eyJ 字面量', src.includes('eyJ'), false)
-  check('host 无个人路径', src.includes('/Users/'), false)
+  check('host 无个人路径', src.includes(['/Users', 'probe'].join('/')), false)
   check('host env 前缀 DSH_CHATGPT', src.includes('DSH_CHATGPT'), true)
+  check('host 不读取或删除 DeepSeek 密钥值', src.includes('ctx.credentials.resolve(\'DEEPSEEK_API_KEY\')'), false)
+  check('host 只切换 DeepSeek 搜索凭据引用', src.includes("SEARCH_SETTINGS_NAMESPACE = 'web-search-deepseek'") && src.includes('DEEPSEEK_SEARCH_KEY_REF'), true)
+  check('host ChatGPT 搜索 fail closed', src.includes('CHATGPT_SEARCH_DISABLED_KEY_REF'), true)
+  check('host 包含单飞保护', src.includes('syncInFlight'), true)
+  check('host 包含默认模型回滚保护', src.includes('restoreDefaultModel'), true)
+  check('host 拒绝自定义同名路由覆盖', src.includes('apiKeyEnv 不是 OPENAI_CODEX_API_KEY'), true)
+  check('host 解绑移除自有路由', src.includes("path: ['providers', 'openai-codex'] }]"), true)
+  check('host 不删除用户已有 Codex 路由', src.includes('同名用户路由只读不删不改'), true)
+  check('host 只清理自有 Codex 凭据', src.includes('codexCredentialOwned') && src.includes('credentialManaged'), true)
+  check('host 失效状态清理 Codex 凭据', (src.match(/clearInjectedCodexCredential\(flag\)/g) || []).length >= 4, true)
+  check('OAuth 启动 RPC 受同源保护', src.includes('MUTATING = { startCodexOAuth: true'), true)
+  check('ChatGPT 默认模型使用明确配置', src.includes('CODEX_DEFAULT_MODEL'), true)
+  check('客户端 RPC 检查 HTTP 状态', clientSrc.includes("if (!r.ok) throw new Error"), true)
+  check('客户端卸载清理授权轮询', clientSrc.includes('pollRef.current'), true)
+  check('插件保留 DeepSeek 搜索 provider 供模式恢复', patchSrc.includes('DEEPSEEK_API_KEY') && !patchSrc.includes('disabled: true'), true)
+  check('绑定和解绑都切换搜索线路', (src.match(/setSearchMode\(/g) || []).length >= 4, true)
+  check('手动模型选择通过轮询同步搜索线路', src.includes('ROUTING_SYNC_INTERVAL_MS') && src.includes('syncRoutingMode'), true)
+  check('未绑定启动不主动注册 ChatGPT 路由', !src.includes('    ensureCodexRoute();\n    syncCodexToken();'), true)
 }
 
 // 清理临时文件

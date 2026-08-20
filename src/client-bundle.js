@@ -17,11 +17,19 @@ module.exports = {
     const PREFIX = '/_dsh/dsh-chatgpt-subscription';
     function rpc(method, args) {
       const url = PREFIX + '/' + method;
+      const controller = new AbortController();
+      const timeout = window.setTimeout(function () { controller.abort(); }, 15000);
       return fetch(url, {
         method: args ? 'POST' : 'GET',
         headers: { 'content-type': 'application/json' },
         body: args ? JSON.stringify(args) : undefined,
-      }).then(function (r) { return r.json(); });
+        signal: controller.signal,
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (body) {
+          if (!r.ok) throw new Error(body.error || ('HTTP ' + r.status));
+          return body;
+        });
+      }).finally(function () { window.clearTimeout(timeout); });
     }
 
     // React 由 bundle 的 require('react') 提供（seed 模块，与官方 client 包同机制）
@@ -41,6 +49,7 @@ module.exports = {
       var _React$useState2 = React.useState(false),
           authorizing = _React$useState2[0],
           setAuthorizing = _React$useState2[1];
+      var pollRef = React.useRef(null);
 
       // 加载状态 + 轮询
       var load = React.useCallback(function () {
@@ -50,7 +59,13 @@ module.exports = {
       React.useEffect(function () {
         load();
         var timer = window.setInterval(load, 5000); // 每 5s 刷新一次（授权中时更快感知）
-        return function () { window.clearInterval(timer); };
+        return function () {
+          window.clearInterval(timer);
+          if (pollRef.current !== null) {
+            window.clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+        };
       }, [load]);
 
       // 授权按钮处理
@@ -65,14 +80,20 @@ module.exports = {
           }
           // 打开浏览器授权页（window.open 兜底；host 也会尝试 open shell）
           if (res.authorizeUrl) window.open(res.authorizeUrl, '_blank');
-          // 轮询直到 bound=true 或超时
-          var poll = window.setInterval(function () {
+          // 轮询直到完成；组件卸载或授权结束时必须清理定时器
+          if (pollRef.current !== null) window.clearInterval(pollRef.current);
+          pollRef.current = window.setInterval(function () {
             rpc('getCodexBridgeStatus').then(function (s) {
               setStatus(s);
               if (s.bound || !s.oauthInFlight) {
-                window.clearInterval(poll);
+                window.clearInterval(pollRef.current);
+                pollRef.current = null;
                 setAuthorizing(false);
               }
+            }).catch(function () {
+              window.clearInterval(pollRef.current);
+              pollRef.current = null;
+              setAuthorizing(false);
             });
           }, 2000);
         }).catch(function (e) {
@@ -136,7 +157,7 @@ module.exports = {
           )
         ),
         h('p', { style: { fontSize: 12, color: 'var(--dsw-alias-label-tertiary)', marginTop: '1rem' } },
-          '说明：绑定由官方 OAuth 流程完成，令牌存储在 ~/.codex/auth.json（0600）。独立插件 dsh-chatgpt-subscription 负责维护令牌，dsh-bottom-info-bar 只读令牌显示额度。'
+          '说明：绑定由官方 OAuth 流程完成，令牌存储在 ~/.codex/auth.json（0600）。独立插件 dsh-chatgpt-subscription 负责维护令牌，dsh-bottom-info-bar 只读令牌显示额度。搜索不会使用 ChatGPT 订阅令牌；插件默认停用 DeepSeek 搜索，需另行配置搜索服务。'
         )
       );
     }

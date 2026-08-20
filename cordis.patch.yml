@@ -4,3 +4,7 @@
 - insert:
     - id: dsh-chatgpt-subscription
       name: 'dsh-chatgpt-subscription'
+
+# The plugin switches the web-search-deepseek provider's credential reference at runtime:
+# ChatGPT mode uses a deliberately absent reference; DeepSeek mode restores
+# DEEPSEEK_API_KEY. Keeping the provider mounted makes the switch reversible.
