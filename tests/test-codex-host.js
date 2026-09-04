@@ -1,3 +1,4 @@
+import { createHostTranslator } from '../src/host-locale.js'
 // dsh-chatgpt-subscription — host 端纯函数与状态机测试（注入式，零真实网络/零真实 auth.json）
 // 提取 host.js 模块级常量与纯函数（将「常量 + 纯函数」作为一个共享作用域整体求值，
 // 使函数能解析到同模块内的兄弟函数与常量——如 decodeJwtExp 调 decodeBase64Url、buildAuthorizeUrl 用 OAUTH_SCOPE）
@@ -64,7 +65,7 @@ function extractModule(nameList, depOverrides) {
   // 片段体用裸名引用这些标识符：除了 Node 本身的内建全局（process/Buffer/URL/URLSearchParams/
   // AbortSignal/fetch），fs/crypto/path 是 import（非全局），必须按原裸名注入到 new Function 作用域。
   const params = [
-    'createHash', 'randomBytes',
+    'createHostTranslator', 'createHash', 'randomBytes',
     'readFileSync', 'writeFileSync', 'renameSync', 'mkdirSync', 'unlinkSync', 'chmodSync',
     'createServer', 'homedir', 'dirname',
   ]
@@ -78,7 +79,7 @@ function extractModule(nameList, depOverrides) {
     createServer: null, homedir: null, dirname,
   }, depOverrides || {})
   return factory(
-    dep.createHash, dep.randomBytes,
+    createHostTranslator, dep.createHash, dep.randomBytes,
     dep.readFileSync, dep.writeFileSync, dep.renameSync, dep.mkdirSync, dep.unlinkSync, dep.chmodSync,
     dep.createServer, dep.homedir, dep.dirname,
   )
@@ -230,7 +231,7 @@ function makeJwt(claims) {
   check('host 不管理搜索配置', !src.includes('SEARCH_SETTINGS_NAMESPACE') && !src.includes('setSearchMode'), true)
   check('host 包含单飞保护', src.includes('syncInFlight'), true)
   check('host 包含默认模型回滚保护', src.includes('restoreDefaultModel'), true)
-  check('host 拒绝自定义同名路由覆盖', src.includes('apiKeyEnv 不是 OPENAI_CODEX_API_KEY'), true)
+  check('host 拒绝自定义同名路由覆盖', src.includes("existing.apiKeyEnv !== 'OPENAI_CODEX_API_KEY'") && src.includes("t('host.aCustomOpenaiCodexRoute')"), true)
   check('host 解绑移除自有路由', src.includes("path: ['providers', 'openai-codex'] }]"), true)
   check('host 不删除用户已有 Codex 路由', src.includes('同名用户路由只读不删不改'), true)
   check('host 只清理自有 Codex 凭据', src.includes('codexCredentialOwned') && src.includes('credentialManaged'), true)

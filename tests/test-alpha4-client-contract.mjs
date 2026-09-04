@@ -13,13 +13,14 @@ const retiredRuntime = ['@deepseek-ai', 'dsh-client-' + 'runtime'].join('/')
 assert.deepEqual(pkg.dsh.client.inject, [
   '@deepseek-ai/dsh-client-ui-settings',
   '@deepseek-ai/dsh-client-ui-settings-general',
+  '@deepseek-ai/dsh-client-locale',
 ])
 assert.ok(!pkg.dsh.client.inject.includes(retiredRuntime), 'retired client runtime must not be injected')
 assert.ok(existsSync(patchPath), 'bundle patch must exist')
 assert.ok(existsSync(join(root, pkg.main)), 'host entry must exist')
 assert.match(readFileSync(patchPath, 'utf8'), /- insert:/)
 
-assert.match(source, /inject:\s*\['slots'\]/, 'client must wait on the public slots service')
+assert.match(source, /inject:\s*\['slots', 'locale'\]/, 'client must wait on the public slots service')
 assert.match(source, /slots\.inject\('settings\.section'/, 'settings section slot must remain registered')
 assert.match(source, /require\('react'\)/, 'React must stay an external client module')
 assert.match(artifact, /window\.__ModuleLoader__\.load/, 'built client must use the DSH module loader')

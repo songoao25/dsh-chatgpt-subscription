@@ -8,6 +8,7 @@ const root = dirname(fileURLToPath(new URL('../package.json', import.meta.url)))
 const files = [
   'test-alpha4-client-contract.mjs',
   'test-codex-host.js',
+  'test-localization.mjs',
 ]
 
 let allPass = true
