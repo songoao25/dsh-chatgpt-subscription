@@ -13,14 +13,14 @@
 
 ```bash
 # 方式一：一键脚本（推荐）
-git clone https://github.com/songoao25/dsh-chatgpt-subscription.git
+git clone https://github.com/SONGOAO25/dsh-chatgpt-subscription.git
 cd dsh-chatgpt-subscription
 ./install.sh
 # 默认安装到 web profile；其他 profile 需以 `dsh web` 方式使用：
 ./install.sh --profile <profile名>
 
 # 方式二：dsh 插件命令（先构建，lib/ 由 build 生成）
-git clone https://github.com/songoao25/dsh-chatgpt-subscription.git
+git clone https://github.com/SONGOAO25/dsh-chatgpt-subscription.git
 cd dsh-chatgpt-subscription
 npm run build
 dsh plugin --profile web add .
@@ -87,4 +87,4 @@ dsh plugin --profile web remove dsh-chatgpt-subscription
 
 ## 与其他插件的关系
 
-- **[Bottom Info Bar](https://github.com/songoao25/dsh-bottom-info-bar)**：信息栏插件只读本插件维护的令牌，在底部信息栏显示 ChatGPT 额度（5 小时/周/月窗口与重置时间）。两者可独立安装；信息栏的 ChatGPT 额度显示需要本插件先绑定。
+- **[Bottom Info Bar](https://github.com/SONGOAO25/dsh-bottom-info-bar)**：信息栏插件只读本插件维护的令牌，在底部信息栏显示 ChatGPT 额度（5 小时/周/月窗口与重置时间）。两者可独立安装；信息栏的 ChatGPT 额度显示需要本插件先绑定。

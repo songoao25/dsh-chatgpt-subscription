@@ -812,7 +812,7 @@ export default {
     }
 
     ctx.inject(['webServer'], function (webCtx) {
-      try {
+      webCtx.effect(function () {
         const dispose = webCtx.webServer.register({
           kind: 'prefix',
           path: ROUTE_PREFIX,
@@ -844,7 +844,7 @@ export default {
         return function () { dispose(); };
       } catch (err) {
         console.warn('[dsh-chatgpt-subscription] webServer 路由注册失败', String((err && err.message) || err));
-      }
+      }, 'dsh-chatgpt-subscription: Web routes');
     }, 'dsh-chatgpt-subscription: Web routes');
 
     // ---------- 启动即刷 + 30min 令牌看护 ----------

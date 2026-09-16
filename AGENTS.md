@@ -21,7 +21,7 @@
 4. **绑定标记（codex-bind.json）是绑定唯一事实**：只有官方 OAuth 授权成功才写标记；codex CLI 登录态绝不自动使用
 5. **解绑/卸载绝不删除 `~/.codex/auth.json`**（codex CLI 自己的登录态）
 6. 静态 bundle 勿改回动态插件；`lib/` 由 `npm run build` 生成
-7. 零密钥、零个人路径；author=songoao25
+7. 零密钥、零个人路径；author=SONGOAO25
 8. OAuth 回调端口生产必须 1455（redirect_uri 与 OpenAI 注册值一致）
 
 ## 开发流程

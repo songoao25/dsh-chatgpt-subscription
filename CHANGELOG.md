@@ -2,6 +2,12 @@
 
 本项目的版本记录遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.1] - 2026-09-16
+
+### Fixed
+
+- **DSH alpha.1 Web 路由生命周期**：将 RPC 路由注册纳入 `webCtx.effect`，让 DSH 在 Web 服务恢复或插件重载时能够正确释放并重新注册路由，避免重复前缀和旧路由失效。
+
 ## [0.2.0] - 2026-08-20
 
 > 用户拍板：移除插件的「搜索模式管理」，回归纯订阅绑定定位。插件不再自动切换搜索线路，搜索商完全由用户在 DSH 配置层自行指定（如 DeepSeek 搜索或第三方搜索服务）。
