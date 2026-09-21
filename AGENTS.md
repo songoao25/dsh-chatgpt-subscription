@@ -7,7 +7,7 @@
 ## 结构
 
 - `src/host.js` — host 半：OAuth 绑定状态机（PKCE/state/回调/令牌交换/写回/绑定标记）、令牌看护（30min 周期 + JWT 过期判定 + 续期 + 凭据注入）、openai-codex 路由注册（displayName=ChatGPT, transport=sse）、RPC（`/_dsh/dsh-chatgpt-subscription/{getCodexBridgeStatus,startCodexOAuth,unbindCodex}`，修改类同源防护）
-- `src/client-bundle.js` — client 半：设置侧边栏「订阅」页（settings.section, id=`chatgpt-subscription`, order=25）
+- `src/client-bundle.js` — client 半：插件详情页「ChatGPT 订阅」配置（`plugins.bundle.config`，key=`dsh-chatgpt-subscription`）
 - `scripts/build.mjs` — 构建（src/ → lib/；client 包装为 `window.__ModuleLoader__.load({ id: "dsh-chatgpt-subscription", ... })`）
 - `tests/` — `run-all.mjs` 入口 + `test-codex-host.js`（36 断言，零真实网络/零真实 auth.json）
 - `cordis.patch.yml` — bundle 挂载行（id 必须为 `dsh-chatgpt-subscription`）
