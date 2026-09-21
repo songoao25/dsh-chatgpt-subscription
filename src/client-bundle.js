@@ -1,4 +1,4 @@
-// dsh-chatgpt-subscription — client half：设置侧边栏「订阅」页（紧邻「模型」、图标一致）
+// dsh-chatgpt-subscription — client half：插件详情页的订阅配置
 module.exports = {
   inject: ['slots'],
   async apply(ctx) {
@@ -9,7 +9,7 @@ module.exports = {
       slots = ctx.slots || ctx.get('slots');
     }
     if (slots === undefined) {
-      console.warn('[dsh-chatgpt-subscription] slots 服务未就绪，设置页未注册');
+      console.warn('[dsh-chatgpt-subscription] slots 服务未就绪，插件配置页未注册');
       return;
     }
 
@@ -41,7 +41,7 @@ module.exports = {
       return React.createElement.apply(React, args);
     }
 
-    // ---------- 设置页组件 ----------
+    // ---------- 插件配置页组件 ----------
     function SubscriptionPage(props) {
       var _React$useState = React.useState(null),
           status = _React$useState[0],
@@ -162,19 +162,22 @@ module.exports = {
       );
     }
 
-    // 注册 settings.section（对齐官方注册模式：ctx.slots.inject 等待 section 声明就绪 +
-    // 显式 label 供侧边栏显示 + children 定义页面子槽 + order 控制排序紧接「模型」(order=10) 之后）
-    // 参考官方 dsh-client-ui-settings-models / settings-plugins 同款写法
-    var dispose = ctx.slots.inject('settings.section', function () {
-      return ctx.slots.register(
+    function SubscriptionBundleConfig(props) {
+      if (props && props.view === 'summary') {
+        return h('span', { className: 'dshChatGPTBundleSummary' }, '绑定 ChatGPT Plus/Pro 订阅，在 DSH 中使用 ChatGPT 模型。');
+      }
+      return h(SubscriptionPage, props);
+    }
+
+    // 当前 DSH 的插件页是外部 bundle 的唯一配置入口；key 必须等于 bundle 包名。
+    var dispose = slots.inject('plugins.bundle.config', function () {
+      return slots.register(
         {
-          name: 'settings.section',
-          id: 'chatgpt-subscription',
-          order: 12,
+          name: 'plugins.bundle.config',
+          key: 'dsh-chatgpt-subscription',
           label: function () { return 'ChatGPT 订阅'; },
-          children: {},
         },
-        SubscriptionPage
+        SubscriptionBundleConfig
       );
     });
 
