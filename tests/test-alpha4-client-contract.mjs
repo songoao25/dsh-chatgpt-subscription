@@ -45,7 +45,9 @@ assert.match(source, /\.cgpt-section \{ display: flex; flex-direction: column; g
 // 区块头照原生 sectionHead：基线对齐 + 10px 间距 + 零内边距，标题 14/500/20
 assert.match(source, /\.cgpt-sectionHead \{ display: flex; align-items: baseline; gap: 10px;[^}]*padding: 0;/, 'section head must use the native baseline alignment, 10px gap and zero padding')
 assert.match(source, /\.cgpt-title \{[^}]*font-size: 14px; font-weight: 500; line-height: 20px;/, 'section title must use the native sectionTitle scale (14/500/20)')
-assert.match(source, /\.cgpt-intro \{[^}]*padding: 0;[^}]*font-size: 13px; line-height: 20px;/, 'section intro must use the native pageIntro scale (13/20) with zero padding')
+// 文案去重铁律：详情页顶部的 manifest 描述已说明「这是什么插件」，页面内不得再放介绍段
+// （.cgpt-intro 已随重复介绍一起删除，防止回归再次复述）
+assert.doesNotMatch(source, /cgpt-intro/, 'in-page intro must stay removed (the manifest description already covers it)')
 // 行 = 原生 .X_2TxG_row：12px 2px + .5px 下边线（末行无线），不是插件列表的 card 几何
 assert.match(source, /\.cgpt-list \{ display: flex; flex-direction: column; gap: 0;/, 'row list must match the native .rows container (gap 0)')
 assert.match(source, /\.cgpt-row \{[^}]*padding: 12px 2px; border: 0; border-bottom: 0\.5px solid var\(--dsw-alias-border-l2/, 'rows must use the native .row geometry (12px 2px + .5px bottom rule)')

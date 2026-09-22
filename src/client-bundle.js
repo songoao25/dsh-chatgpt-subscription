@@ -69,7 +69,6 @@ module.exports = {
     //   detailSection  { flex-col; gap:12px }  → .cgpt-section
     //   sectionHead    { baseline; gap:10px; padding:0 } → .cgpt-sectionHead
     //   sectionTitle   { 14/500/20 }           → .cgpt-title
-    //   sectionCount   { 12/18 二级色 }         → .cgpt-intro / .cgpt-sectionCount
     //   rows           { flex-col; gap:0 }     → .cgpt-list
     //   row            { padding:12px 2px; border-bottom:.5px solid border-l2 } → .cgpt-row
     //   row:last-child { border-bottom:0 }
@@ -96,7 +95,6 @@ module.exports = {
         .cgpt-sectionHead { display: flex; align-items: baseline; gap: 10px; width: 100%; min-width: 0; padding: 0; }
         .cgpt-title { margin: 0; min-width: 0; font-size: 14px; font-weight: 500; line-height: 20px; color: var(--dsw-alias-label-primary); }
         .cgpt-sectionCount { color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; }
-        .cgpt-intro { width: 100%; margin: 0; padding: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 20px; }
         /* 行 = 原生详情页的 .X_2TxG_row：12px 2px 内边距 + .5px 下边线（末行无线），
            无圆角、无 hover 填充、无负外边距。分隔靠边线，所以列表 gap 为 0。 */
         .cgpt-list { display: flex; flex-direction: column; gap: 0; width: 100%; min-width: 0; }
@@ -251,18 +249,18 @@ module.exports = {
         return h > 0 ? h + 'h' + p(m) + 'm' : p(m) + ':' + p(s);
       }
 
-      // 区块头：照原生 sectionHead（基线对齐、10px 间距、标题 14/500/20）
+      // 区块头：照原生 sectionHead（基线对齐、10px 间距、标题 14/500/20）。
+      // 只放标题——「这是什么插件」由详情页顶部的 manifest 描述负责，这里不再复述。
       var head = h('div', { className: 'cgpt-sectionHead' },
-        h('h4', { className: 'cgpt-title' }, 'ChatGPT 订阅'),
-        h('span', { className: 'cgpt-sectionCount' }, 'DeepSeek Harness 插件'));
-      var intro = h('p', { className: 'cgpt-intro' }, '把你自己的 ChatGPT 账号绑到这里，就能在 DSH 里直接用 ChatGPT 模型聊天，用量算在你自己的订阅额度上。');
-      var note = h('p', { className: 'cgpt-note cgpt-note--pre' },
-        '绑定会打开 OpenAI 官方登录页，登录信息只存在这台电脑上，不经过任何第三方服务器。\n'
-        + '解绑会删除本机保存的登录信息。');
+        h('h4', { className: 'cgpt-title' }, 'ChatGPT 订阅'));
+      // 页脚只讲页面级事实（隐私）；「绑定会打开登录页」在使用状态行里随按钮说一次，
+      // 「解绑会删本机登录信息」在解绑确认弹窗里说一次——各自只出现一次。
+      var note = h('p', { className: 'cgpt-note' },
+        '登录信息只保存在这台电脑上，不经过任何第三方服务器。');
 
       if (!status) {
         return h('div', { className: 'cgpt-page' },
-          h('div', { className: 'cgpt-section' }, head, intro),
+          h('div', { className: 'cgpt-section' }, head),
           h('p', { className: 'cgpt-loading' }, '加载中…'));
       }
 
@@ -325,7 +323,7 @@ module.exports = {
       }
 
       return h('div', { className: 'cgpt-page' },
-        h('div', { className: 'cgpt-section' }, head, intro),
+        h('div', { className: 'cgpt-section' }, head),
         hList('div', { className: 'cgpt-section' }, [
           hList('div', { className: 'cgpt-list' }, rows),
           alerts.length > 0 ? hList('div', { className: 'cgpt-alerts' }, alerts) : null,
@@ -335,7 +333,7 @@ module.exports = {
 
     function SubscriptionBundleConfig(props) {
       if (props && props.view === 'summary') {
-        return h('span', { className: 'dshChatGPTBundleSummary' }, '绑定你自己的 ChatGPT 账号，在 DSH 里用 ChatGPT 模型聊天。');
+        return h('span', { className: 'dshChatGPTBundleSummary' }, '把你的 ChatGPT 账号绑进 DSH：登录一次，就能在 DSH 里直接用 ChatGPT 模型聊天，底部信息栏会显示剩余额度。');
       }
       return h(SubscriptionPage, props);
     }
