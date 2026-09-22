@@ -56,6 +56,11 @@ function settingsServiceReady(settings) {
 const CODEX_JWT_ACCOUNT_CLAIM = 'https://api.openai.com/auth' // access_token JWT payload 里账号声明的命名空间键（wham 账号提取用）
 const OAUTH_SCOPE = 'openid profile email offline_access' // 官方授权 scope（与 pi-ai/Codex CLI 一致；offline_access 换 refresh_token）
 
+// ---------- 用户可见文案（集中收口，避免同一语义在同步与授权两条路径上各写一份而漂移） ----------
+// 写作原则：不出现术语（令牌/凭据/注入/路由/环境变量/文件路径），每条都要有「发生了什么 + 你现在该做什么」。
+const MSG_CREDENTIAL_CONFLICT = 'DSH 里存着另一个 OpenAI 账号的登录信息，不是本插件刚绑定的这个，所以本插件不会动它。\n如果你确实想用刚绑定的账号，请先到 DSH 的凭据设置里删掉那一条，再回来点「重新绑定」。'
+const MSG_ROUTE_CONFLICT = 'DSH 里已经有一条同名的 ChatGPT 通道，那是你自己配置的，本插件不会改动它。\n如果想交给本插件管理，请先删除那一条，再点「重新绑定」。'
+
 // ---------- 绑定标记（严格官方模式唯一事实） ----------
 // 语义：只有本插件 OAuth 绑定成功写入的标记存在且 bound=true 时，才注入令牌到 DSH 凭据。
 // codex CLI 自己的令牌（无标记）绝不被自动使用——彻底废弃旧"读登录态"桥接来源。
@@ -74,6 +79,7 @@ function readBindFlag(filePath) {
     return {
       ok: true,
       bound: data.bound === true,
+      boundAt: typeof data.boundAt === 'string' ? data.boundAt : null,
       routeOwned: data.routeOwned === true,
       defaultModelManaged: data.defaultModelManaged === true,
       previousDefaultModel: data.previousDefaultModel && typeof data.previousDefaultModel === 'object' ? data.previousDefaultModel : null,
@@ -122,15 +128,25 @@ function decodeBase64Url(input) {
   }
 }
 
-// JWT exp 解码（秒）：标准 JWT 取第 2 段 payload 的 exp；非 JWT/损坏/缺 exp → null（调用方走 last_refresh 兜底）
-function decodeJwtExp(token) {
+// JWT payload 通用解码：标准 JWT 取第 2 段；非 JWT/损坏/非对象 → null。
+// 只做只读解码，令牌值始终留在内存，不打印、不落盘、不进日志。
+function decodeJwtPayload(token) {
   if (typeof token !== 'string' || token.length === 0) return null
   const parts = token.split('.')
   if (parts.length !== 3) return null
   const raw = decodeBase64Url(parts[1])
   if (raw == null) return null
-  let payload = null
-  try { payload = JSON.parse(raw) } catch (err) { return null }
+  try {
+    const payload = JSON.parse(raw)
+    return payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : null
+  } catch (err) {
+    return null
+  }
+}
+
+// JWT exp 解码（秒）：标准 JWT 取第 2 段 payload 的 exp；非 JWT/损坏/缺 exp → null（调用方走 last_refresh 兜底）
+function decodeJwtExp(token) {
+  const payload = decodeJwtPayload(token)
   const exp = payload && payload.exp
   return typeof exp === 'number' && isFinite(exp) && exp > 0 ? exp : null
 }
@@ -277,16 +293,95 @@ function parseCallbackUrl(url) {
 
 // 从 access_token JWT payload 提取 chatgpt_account_id（wham 额度接口所需）；失败 → null
 function codexAccountIdFromJwt(token) {
-  if (typeof token !== 'string' || token.length === 0) return null
-  const parts = token.split('.')
-  if (parts.length !== 3) return null
-  const raw = decodeBase64Url(parts[1])
-  if (raw == null) return null
-  let payload = null
-  try { payload = JSON.parse(raw) } catch (err) { return null }
+  const payload = decodeJwtPayload(token)
   const auth = payload && payload[CODEX_JWT_ACCOUNT_CLAIM]
   const id = auth && auth.chatgpt_account_id
   return typeof id === 'string' && id.length > 0 ? id : null
+}
+
+// 令牌是否已过期（秒精度）：exp 可判定且已过 → true；无法判定（非 JWT / 缺 exp）→ false（不做无根据的否定）
+function codexIsTokenExpired(token, nowSeconds) {
+  const exp = decodeJwtExp(token)
+  if (typeof exp !== 'number') return false
+  return exp <= nowSeconds
+}
+
+// 判定 DSH 凭据槽里那份 OpenAI 登录信息能否被本插件接管。
+//
+// 【为什么需要这个函数】v0.1.0 写入的绑定标记只有 { bound, boundAt }，没有「凭据归本插件所有」这一栏。
+// 旧判定在这种情况下退化成「槽位非空即视为他人所有」，而槽里躺的恰恰是插件自己早期注入的令牌，
+// 于是插件把自己永久锁在门外（2026-08-20 起常驻「检测到用户已有…插件不会覆盖」红字，连重新授权都救不回来）。
+// 根治办法不是再加一条特例，而是让归属判定建立在**可自证的证据**上：逐字节同值、同一 ChatGPT 账号，
+// 都属于"这份凭据只可能来自同一来源"，无需依赖任何历史记账。
+//
+// 判据按强度递减，命中即允许接管：
+//   owned         进程内已确认是本插件写入的
+//   managed       绑定标记记录了「凭据归本插件所有」
+//   empty         槽位为空 → 首次注入
+//   same-value    槽内令牌与本插件当前令牌逐字节相同 → 同源
+//   same-account  两者属于同一 ChatGPT 账号 → 同一来源的新旧版本
+//   expired-stale 插件处于已绑定状态、槽内令牌已过期而新令牌有效 → 过期凭据对任何人都没有价值
+//   other         其余一律拒绝：真正的他人凭据，绝不覆盖
+// 返回 { claim, reason }；reason 仅供测试与排障，不进入任何用户可见文案。
+function classifyCodexCredential(existingValue, candidateToken, options) {
+  const opts = options && typeof options === 'object' ? options : {}
+  if (opts.ownedInProcess === true) return { claim: true, reason: 'owned' }
+  if (opts.managed === true) return { claim: true, reason: 'managed' }
+  const existing = typeof existingValue === 'string' ? existingValue : ''
+  if (existing.length === 0) return { claim: true, reason: 'empty' }
+  const candidate = typeof candidateToken === 'string' ? candidateToken : ''
+  if (candidate.length === 0) return { claim: false, reason: 'no-candidate' }
+  if (existing === candidate) return { claim: true, reason: 'same-value' }
+  const existingAccount = codexAccountIdFromJwt(existing)
+  const candidateAccount = codexAccountIdFromJwt(candidate)
+  if (existingAccount && candidateAccount && existingAccount === candidateAccount) return { claim: true, reason: 'same-account' }
+  const nowSec = typeof opts.nowSeconds === 'number' ? opts.nowSeconds : Math.floor(Date.now() / 1000)
+  if (opts.boundFlag === true && codexIsTokenExpired(existing, nowSec) && !codexIsTokenExpired(candidate, nowSec)) {
+    return { claim: true, reason: 'expired-stale' }
+  }
+  return { claim: false, reason: 'other' }
+}
+
+// 账本迁移：把「这份凭据归本插件所有」补记进绑定标记，并保留既有字段与首次绑定时间。
+// 迁移一次即永久自证，之后连同源判定都不再需要 —— 这是防止同类旧标记再次把插件锁死的关键一环。
+function withCredentialManaged(flag) {
+  const base = flag && typeof flag === 'object' ? flag : {}
+  return {
+    routeOwned: base.routeOwned === true,
+    defaultModelManaged: base.defaultModelManaged === true,
+    previousDefaultModel: base.previousDefaultModel && typeof base.previousDefaultModel === 'object' ? base.previousDefaultModel : null,
+    credentialManaged: true,
+    boundAt: typeof base.boundAt === 'string' && base.boundAt.length > 0 ? base.boundAt : new Date().toISOString(),
+  }
+}
+
+// 邮箱脱敏（页面展示用）：本地部分最多留前 2 位，域名保留；无法识别 → null。
+// 脱敏一律在 host 侧完成 —— 完整邮箱绝不进入前端、日志或错误信息。
+function maskEmail(email) {
+  if (typeof email !== 'string' || email.length === 0) return null
+  const at = email.indexOf('@')
+  if (at <= 0 || at === email.length - 1) return null
+  const local = email.slice(0, at)
+  const head = local.slice(0, local.length > 2 ? 2 : 1)
+  return head + '•••' + email.slice(at)
+}
+
+// 账号摘要（页面展示用）：id_token 优先、access_token 兜底；解不出 → null 字段（页面显示「暂未读到」）。
+function codexAccountSummary(auth) {
+  const tokens = auth && typeof auth === 'object' && auth.tokens && typeof auth.tokens === 'object' ? auth.tokens : {}
+  const idClaims = decodeJwtPayload(typeof tokens.id_token === 'string' ? tokens.id_token : '')
+  const accessClaims = decodeJwtPayload(typeof tokens.access_token === 'string' ? tokens.access_token : '')
+  const claims = idClaims || accessClaims || {}
+  const authClaim = claims[CODEX_JWT_ACCOUNT_CLAIM] && typeof claims[CODEX_JWT_ACCOUNT_CLAIM] === 'object' ? claims[CODEX_JWT_ACCOUNT_CLAIM] : {}
+  const plan = typeof authClaim.chatgpt_plan_type === 'string' && authClaim.chatgpt_plan_type.length > 0 ? authClaim.chatgpt_plan_type : null
+  return { email: maskEmail(claims.email), plan: plan }
+}
+
+// 套餐英文标识 → 页面展示名；未知档位原样返回（不猜、不编）
+function planDisplayName(plan) {
+  if (typeof plan !== 'string' || plan.length === 0) return null
+  const map = { free: 'Free', plus: 'Plus', pro: 'Pro', team: 'Team', business: 'Business', enterprise: 'Enterprise', edu: 'Edu' }
+  return map[plan.toLowerCase()] || plan
 }
 
 // 构造 OAuth 绑定后的 auth.json 对象：保留既有结构（codex CLI/OpenCode 兼容），仅替换令牌字段 + last_refresh；
@@ -439,14 +534,14 @@ export default {
     async function ensureCodexRoute(flag) {
       const settings = ctx.settings || ctx.get('settings');
       if (!settingsServiceReady(settings)) {
-        return { ok: false, owned: false, message: 'settings 服务未就绪，下个周期重试' };
+        return { ok: false, owned: false, message: 'DSH 还没准备好，稍后会自动再试一次' };
       }
       try {
         const cur = readSettingsSection(settings, 'llm-pi-ai');
         const providers = cur && typeof cur === 'object' && cur.providers && typeof cur.providers === 'object' ? cur.providers : {};
         const existing = providers['openai-codex'];
         if (existing && existing.apiKeyEnv !== 'OPENAI_CODEX_API_KEY') {
-          return { ok: false, owned: false, message: '检测到用户自定义的 openai-codex 路由（apiKeyEnv 不是 OPENAI_CODEX_API_KEY），插件不会覆盖' };
+          return { ok: false, owned: false, message: MSG_ROUTE_CONFLICT };
         }
         if (existing) {
           // 只有绑定标记证明是插件旧版本创建的路由时才升级；同名用户路由只读不删不改。
@@ -461,7 +556,7 @@ export default {
         await settings.mutate('llm-pi-ai', [{ op: 'set', path: ['providers', 'openai-codex'], value: { apiKeyEnv: 'OPENAI_CODEX_API_KEY', displayName: 'ChatGPT', transport: 'sse' } }]);
         return { ok: true, owned: true };
       } catch (err) {
-        return { ok: false, owned: false, message: 'openai-codex 路由注册失败，稍后重试' };
+        return { ok: false, owned: false, message: 'ChatGPT 通道没建起来，稍后会自动再试一次' };
       }
     }
 
@@ -478,7 +573,7 @@ export default {
 
     async function configureDefaultModel() {
       const service = ctx.get('agentDefaultModel');
-      if (!service || typeof service.currentSelection !== 'function' || typeof service.saveSelection !== 'function') return { ok: false, previous: null, message: '默认模型服务未就绪，无法安全切换到 ChatGPT' };
+      if (!service || typeof service.currentSelection !== 'function' || typeof service.saveSelection !== 'function') return { ok: false, previous: null, message: 'DSH 还没准备好，暂时没法把默认模型切成 ChatGPT' };
       const current = service.currentSelection();
       if (!current || current.provider === 'openai-codex') return { ok: true, previous: null };
       await service.saveSelection({ provider: 'openai-codex', model: CODEX_DEFAULT_MODEL, reasoningEffort: current.reasoningEffort });
@@ -494,11 +589,18 @@ export default {
     }
 
     // ---------- 令牌看护（严格官方模式：绑定标记唯一事实） ----------
-    async function canClaimCodexCredential(flag) {
-      if (codexCredentialOwned || (flag && flag.credentialManaged === true)) return true;
-      if (typeof ctx.credentials.resolve !== 'function') return false;
+    // 判定的不是「槽里有没有东西」，而是「槽里那东西是不是本插件的」。
+    // 旧实现只判空，导致插件把自己早期注入的令牌当成别人的，永久拒绝更新 —— 红字死锁的根因。
+    async function classifyCodexCredentialSlot(flag, candidateToken) {
+      if (codexCredentialOwned) return { claim: true, reason: 'owned' };
+      if (flag && flag.credentialManaged === true) return { claim: true, reason: 'managed' };
+      if (typeof ctx.credentials.resolve !== 'function') return { claim: false, reason: 'no-credentials-service' };
       const existing = await ctx.credentials.resolve('OPENAI_CODEX_API_KEY');
-      return !(existing && typeof existing.value === 'string' && existing.value.length > 0);
+      return classifyCodexCredential(
+        existing && typeof existing === 'object' ? existing.value : '',
+        candidateToken,
+        { boundFlag: Boolean(flag && flag.bound), nowSeconds: Math.floor(Date.now() / 1000) }
+      );
     }
 
     async function clearInjectedCodexCredential(flag) {
@@ -517,7 +619,7 @@ export default {
     async function syncCodexToken() {
       if (syncInFlight) return syncInFlight;
       syncInFlight = syncCodexTokenOnce().catch(function () {
-        codexBridgeState = { ok: false, lastSyncAt: Date.now(), expiresAt: null, error: { kind: 'exception', message: '同步异常' }, routeConfigured: codexBridgeState.routeConfigured };
+        codexBridgeState = { ok: false, lastSyncAt: Date.now(), expiresAt: null, error: { kind: 'exception', message: '同步时出了点问题，稍后会自动再试一次' }, routeConfigured: codexBridgeState.routeConfigured };
       }).finally(function () { syncInFlight = null; });
       return syncInFlight;
     }
@@ -529,10 +631,10 @@ export default {
       if (!flag.bound) {
         const cleared = await clearInjectedCodexCredential(flag);
         try { await removeOwnedCodexRoute(flag); codexRouteOwned = false; } catch (err) {
-          codexBridgeState = { ok: false, lastSyncAt: nowMs, expiresAt: null, error: { kind: 'route-cleanup', message: '解绑路由清理失败' }, routeConfigured: true };
+          codexBridgeState = { ok: false, lastSyncAt: nowMs, expiresAt: null, error: { kind: 'route-cleanup', message: '解绑后没清理干净，稍后会自动再试一次' }, routeConfigured: true };
           return;
         }
-        codexBridgeState = { ok: false, lastSyncAt: nowMs, expiresAt: null, error: cleared ? { kind: 'unbound', message: '未绑定 ChatGPT 订阅，请在 DSH 设置「订阅」页授权绑定' } : { kind: 'credentials-cleanup', message: '未绑定，但旧凭据清理失败' }, routeConfigured: false };
+        codexBridgeState = { ok: false, lastSyncAt: nowMs, expiresAt: null, error: cleared ? { kind: 'unbound', message: '还没有绑定 ChatGPT 账号' } : { kind: 'credentials-cleanup', message: '还没有绑定，而且之前留下的登录信息也没清掉' }, routeConfigured: false };
         return;
       }
       if (!codexBridgeState.routeConfigured) {
@@ -549,7 +651,7 @@ export default {
         const cleared = await clearInjectedCodexCredential(flag);
         let routeRemoved = true;
         try { await removeOwnedCodexRoute(flag); codexRouteOwned = false; } catch (err) { routeRemoved = false; }
-        const error = !routeRemoved ? { kind: 'route-cleanup', message: '绑定失效且路由清理失败' } : cleared ? { kind: 'no-login', message: '绑定已失效：未找到登录凭证，请重新授权' } : { kind: 'credentials-cleanup', message: '登录凭证缺失且旧凭据清理失败' };
+        const error = !routeRemoved ? { kind: 'route-cleanup', message: '绑定已经失效，而且通道没清理干净' } : cleared ? { kind: 'no-login', message: '找不到登录信息了，请重新绑定' } : { kind: 'credentials-cleanup', message: '登录信息不见了，旧信息也没清掉，请重新绑定' };
         codexBridgeState = { ok: false, lastSyncAt: nowMs, expiresAt: null, error: error, routeConfigured: !routeRemoved };
         return;
       }
@@ -562,7 +664,7 @@ export default {
         const cleared = await clearInjectedCodexCredential(flag);
         let routeRemoved = true;
         try { await removeOwnedCodexRoute(flag); codexRouteOwned = false; } catch (err) { routeRemoved = false; }
-        const error = !routeRemoved ? { kind: 'route-cleanup', message: '绑定失效且路由清理失败' } : cleared ? { kind: 'no-key', message: '绑定已失效：缺少 access_token，请重新授权' } : { kind: 'credentials-cleanup', message: '缺少 access_token 且旧凭据清理失败' };
+        const error = !routeRemoved ? { kind: 'route-cleanup', message: '绑定失效且路由清理失败' } : cleared ? { kind: 'no-key', message: '登录信息不完整，请重新绑定' } : { kind: 'credentials-cleanup', message: '登录信息不完整，旧信息也没清掉，请重新绑定' };
         codexBridgeState = { ok: false, lastSyncAt: nowMs, expiresAt: null, error: error, routeConfigured: !routeRemoved };
         return;
       }
@@ -572,7 +674,7 @@ export default {
 
       if (codexNeedsRefresh(expiresAtSec, nowSec)) {
         if (!refresh) {
-          error = { kind: 'auth', message: '令牌临近过期但缺少 refresh_token，请重新授权' };
+          error = { kind: 'auth', message: '登录快到期了，而且没法自动续期，请重新绑定' };
         } else {
           const pair = await refreshCodexTokenPair(refresh);
           if (pair) {
@@ -584,7 +686,7 @@ export default {
             } catch (err) {
               token = pair.access_token;
               expiresAtSec = codexExpiresAt(decodeJwtExp(pair.access_token), nowMs);
-              error = { kind: 'write', message: '续期成功但写回 auth.json 失败' };
+              error = { kind: 'write', message: '续期成功，但没能存到本地，下次可能还要重新绑定' };
             }
           } else {
             const reRead = readCodexAuthFile(CODEX_AUTH_FILE);
@@ -596,7 +698,7 @@ export default {
               token = reAccess;
               expiresAtSec = codexExpiresAt(decodeJwtExp(reAccess), reRefreshMs);
             } else {
-              error = { kind: 'auth', message: '令牌续期失败（refresh_token 可能失效），请重新授权' };
+              error = { kind: 'auth', message: '自动续期失败，请重新绑定' };
             }
           }
         }
@@ -606,19 +708,24 @@ export default {
 
       if (!token && error) {
         const cleared = await clearInjectedCodexCredential(flag);
-        if (!cleared) error = { kind: 'credentials-cleanup', message: '令牌不可用且旧凭据清理失败' };
+        if (!cleared) error = { kind: 'credentials-cleanup', message: '登录信息用不了，旧信息也没清掉，请重新绑定' };
       }
       if (token && token !== codexInjectedToken) {
-        const canClaim = await canClaimCodexCredential(flag);
-        if (!canClaim) {
-          error = { kind: 'credentials-conflict', message: '检测到用户已有 OPENAI_CODEX_API_KEY，插件不会覆盖' };
+        const claim = await classifyCodexCredentialSlot(flag, token);
+        if (!claim.claim) {
+          error = { kind: 'credentials-conflict', message: MSG_CREDENTIAL_CONFLICT };
         } else try {
           await ctx.credentials.set('OPENAI_CODEX_API_KEY', token);
           codexInjectedToken = token;
           codexCredentialOwned = true;
+          // 账本迁移：老版本绑定标记缺「凭据归本插件所有」一栏，成功接管后立即补记，
+          // 之后每次同步都能一步自证，不必再依赖同源判定 —— 防复发。
+          if (!(flag && flag.credentialManaged === true)) {
+            try { writeBindFlag(CODEX_BIND_FILE, withCredentialManaged(flag)); } catch (migErr) { /* 记账失败不影响本次可用，下周期再补 */ }
+          }
         } catch (err) {
           const cleared = await clearInjectedCodexCredential(flag);
-          error = cleared ? { kind: 'credentials', message: '凭据注入失败' } : { kind: 'credentials-cleanup', message: '凭据注入和旧凭据清理均失败' };
+          error = cleared ? { kind: 'credentials', message: '登录信息同步到 DSH 失败，请重试或重新绑定' } : { kind: 'credentials-cleanup', message: '登录信息同步失败，且旧信息清理也未成功，请重新绑定' };
         }
       }
       codexBridgeState = { ok: !error, lastSyncAt: nowMs, expiresAt: expiresAtSec != null ? expiresAtSec * 1000 : null, error: error, routeConfigured: codexBridgeState.routeConfigured };
@@ -681,10 +788,10 @@ export default {
           waitCode.promise,
           new Promise(function (resolve) { timer = setTimeout(function () { resolve(null); }, OAUTH_CALLBACK_TIMEOUT_MS); }),
         ]);
-        if (!code) { oauthLastError = { kind: 'timeout', message: '授权超时（5 分钟），请重试' }; return; }
+        if (!code) { oauthLastError = { kind: 'timeout', message: '等了 5 分钟没等到授权结果，已取消。请再点一次「绑定 ChatGPT 账号」' }; return; }
         const exchanged = await exchangeAuthorizationCode(code, pkce.verifier);
         if (!exchanged.ok) {
-          oauthLastError = { kind: 'exchange', message: '令牌交换失败（' + (exchanged.status != null ? 'HTTP ' + exchanged.status : '网络错误') + '），请重试' };
+          oauthLastError = { kind: 'exchange', message: '授权完成了，但没取到登录信息（' + (exchanged.status != null ? '网络返回 ' + exchanged.status : '连不上网络') + '）。请重试' };
           return;
         }
         const nowIso = new Date().toISOString();
@@ -695,7 +802,7 @@ export default {
         try {
           writeAuthJson(CODEX_AUTH_FILE, authToWrite, exchanged.access_token, authToWrite.tokens.refresh_token != null ? authToWrite.tokens.refresh_token : null, nowIso);
         } catch (err) {
-          oauthLastError = { kind: 'write', message: '绑定成功但写入 auth.json 失败' };
+          oauthLastError = { kind: 'write', message: '登录成功了，但没能存到本地。请重新绑定' };
           return;
         }
         const priorFlag = readBindFlag(CODEX_BIND_FILE);
@@ -711,7 +818,7 @@ export default {
           if (!defaultModel.previous && priorFlag.defaultModelManaged) defaultModel.previous = priorFlag.previousDefaultModel;
         } catch (err) {
           await rollbackBindingSetup(route, defaultModel, previousAuth, newAccessToken);
-          oauthLastError = { kind: 'default-model', message: '绑定成功但默认模型切换失败，请检查设置后重试' };
+          oauthLastError = { kind: 'default-model', message: '绑定成功了，但没能自动设为默认模型。请到「模型」设置里手动选一次 ChatGPT' };
           return;
         }
         if (!defaultModel.ok) {
@@ -719,32 +826,30 @@ export default {
           oauthLastError = { kind: 'default-model', message: defaultModel.message };
           return;
         }
-        const canClaim = await canClaimCodexCredential(priorFlag);
-        if (!canClaim) {
+        const claim = await classifyCodexCredentialSlot(priorFlag, exchanged.access_token);
+        if (!claim.claim) {
           await rollbackBindingSetup(route, defaultModel, previousAuth, newAccessToken);
-          oauthLastError = { kind: 'credentials-conflict', message: '检测到用户已有 OPENAI_CODEX_API_KEY，插件不会覆盖' };
+          oauthLastError = { kind: 'credentials-conflict', message: MSG_CREDENTIAL_CONFLICT };
           return;
         }
         try {
-          writeBindFlag(CODEX_BIND_FILE, {
+          writeBindFlag(CODEX_BIND_FILE, Object.assign(withCredentialManaged(priorFlag), {
             routeOwned: route.owned,
             defaultModelManaged: Boolean(defaultModel.previous),
             previousDefaultModel: defaultModel.previous,
-            credentialManaged: true,
-          });
+          }, { boundAt: nowIso }));
         } catch (err) {
           await rollbackBindingSetup(route, defaultModel, previousAuth, newAccessToken);
-          oauthLastError = { kind: 'write', message: '绑定成功但写入绑定标记失败' };
+          oauthLastError = { kind: 'write', message: '绑定成功了，但状态没存住。请重新绑定' };
           return;
         }
         try {
-          await ctx.credentials.set('OPENAI_CODEX_API_KEY', exchanged.access_token);
-          codexInjectedToken = exchanged.access_token;
+          await ctx.credentials.set('OPENAI_CODEX_API_KEY', exchanged.access_token);          codexInjectedToken = exchanged.access_token;
           codexCredentialOwned = true;
         } catch (err) {
           try { clearBindFlag(CODEX_BIND_FILE); } catch (clearErr) { /* 状态仍保持失败，下一次同步会继续清理 */ }
           await rollbackBindingSetup(route, defaultModel, previousAuth, newAccessToken);
-          oauthLastError = { kind: 'credentials', message: '绑定失败：凭据注入失败' };
+          oauthLastError = { kind: 'credentials', message: '绑定失败：登录信息没能交给 DSH。请重试' };
           codexBridgeState = { ok: false, lastSyncAt: Date.now(), expiresAt: null, error: oauthLastError, routeConfigured: route.ok };
           return;
         }
@@ -752,7 +857,7 @@ export default {
         codexBridgeState = { ok: true, lastSyncAt: Date.now(), expiresAt: expiresAtSec != null ? expiresAtSec * 1000 : null, error: null, routeConfigured: route.ok };
       } catch (err) {
         await rollbackBindingSetup(route, defaultModel, previousAuth, newAccessToken);
-        oauthLastError = { kind: 'exception', message: '绑定异常，请重试' };
+        oauthLastError = { kind: 'exception', message: '绑定时出了点问题，请重试' };
       } finally {
         if (timer) clearTimeout(timer);
         try { serverHandle.close(); } catch (err) { /* 忽略 */ }
@@ -761,7 +866,7 @@ export default {
     }
 
     async function startCodexOAuthRpc() {
-      if (oauthInFlight) return { ok: false, oauthInFlight: true, error: { kind: 'in-flight', message: '授权进行中，请稍候' } };
+      if (oauthInFlight) return { ok: false, oauthInFlight: true, error: { kind: 'in-flight', message: '正在等你在浏览器里完成授权，请稍候' } };
       oauthInFlight = true;
       oauthLastError = null;
       const pkce = createPkcePair();
@@ -771,17 +876,17 @@ export default {
       const serverHandle = await startOAuthCallbackServer(state, function (code) { waitCode.resolve(code); }, port);
       if (!serverHandle) {
         oauthInFlight = false;
-        return { ok: false, oauthInFlight: false, error: { kind: 'port-busy', message: '回调端口 ' + port + ' 被占用，请关闭占用程序（如正在运行的 codex 登录）后重试' } };
+        return { ok: false, oauthInFlight: false, error: { kind: 'port-busy', message: '本机 ' + port + ' 端口被别的程序占了。请关掉它（比如正在登录的 Codex 命令行），再重试' } };
       }
       const authorizeUrl = buildAuthorizeUrl(state, pkce.challenge);
       runCodexOAuthFlow(pkce, state, serverHandle, authorizeUrl, waitCode).catch(function () {
-        oauthLastError = { kind: 'exception', message: '绑定异常，请重试' };
+        oauthLastError = { kind: 'exception', message: '绑定时出了点问题，请重试' };
       });
       return { ok: true, authorizeUrl: authorizeUrl, oauthInFlight: true };
     }
 
     async function unbindCodexRpc() {
-      if (oauthInFlight) return { ok: false, error: { kind: 'in-flight', message: '授权进行中，请先完成或等待超时' } };
+      if (oauthInFlight) return { ok: false, error: { kind: 'in-flight', message: '正在等你在浏览器里完成授权，请先把它做完，或等它超时' } };
       try {
         const flag = readBindFlag(CODEX_BIND_FILE);
         await removeOwnedCodexRoute(flag);
@@ -790,7 +895,7 @@ export default {
         const cleared = await clearInjectedCodexCredential(flag);
         if (!cleared) throw new Error('credentials cleanup failed');
         clearBindFlag(CODEX_BIND_FILE);
-        codexBridgeState = { ok: false, lastSyncAt: Date.now(), expiresAt: null, error: { kind: 'unbound', message: '已解绑 ChatGPT 订阅，请重新授权绑定' }, routeConfigured: false };
+        codexBridgeState = { ok: false, lastSyncAt: Date.now(), expiresAt: null, error: { kind: 'unbound', message: '已经解除绑定' }, routeConfigured: false };
         return { ok: true, bound: false };
       } catch (err) {
         return { ok: false, error: { kind: 'exception', message: '解绑失败，请重试' } };
@@ -799,6 +904,9 @@ export default {
 
     function getCodexBridgeStatusRpc() {
       const flag = readBindFlag(CODEX_BIND_FILE);
+      // 账号摘要只在已绑定时读一次本地登录文件；邮箱已在 host 侧脱敏，完整值不跨进程传输。
+      const read = flag.bound ? readCodexAuthFile(CODEX_AUTH_FILE) : { ok: false };
+      const summary = read.ok ? codexAccountSummary(read.auth) : null;
       return {
         ok: codexBridgeState.ok,
         bound: flag.bound,          // 绑定标记是唯一事实
@@ -807,6 +915,7 @@ export default {
         lastSyncAt: codexBridgeState.lastSyncAt,
         error: oauthLastError || codexBridgeState.error,
         routeConfigured: codexBridgeState.routeConfigured,
+        account: summary ? { email: summary.email, plan: planDisplayName(summary.plan) } : null,
       };
     }
 

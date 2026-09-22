@@ -125,7 +125,11 @@ module.exports = {
         .cgpt-alert { width: 100%; min-width: 0; margin: 0; font-size: 12px; line-height: 18px; }
         /* 错误：照原生 .X_2TxG_failure（行内 flex + 错误色 + gap 10）+ .X_2TxG_reason（12/18 可换行）。 */
         .cgpt-alert--error { display: flex; align-items: center; gap: 10px; color: var(--dsw-alias-state-error-primary, #d92d20); overflow-wrap: anywhere; white-space: pre-wrap; }
+        .cgpt-alertText { flex: 1 1 auto; min-width: 0; }
+        .cgpt-alertActions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; margin-left: auto; }
+        @media (max-width: 600px) { .cgpt-alert--error { flex-wrap: wrap; } .cgpt-alertActions { margin-left: 0; } }
         .cgpt-alert--warning { background: color-mix(in srgb, var(--dsw-alias-state-warning-primary, #f59e0b) 12%, transparent); color: var(--dsw-alias-label-primary); border-radius: 10px; padding: 8px 12px; }
+        .cgpt-note--pre { white-space: pre-line; }
         .cgpt-note { width: 100%; margin: 0; padding: 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
         .cgpt-loading { margin: 0; padding: 0 8px; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; }
         @media (max-width: 600px) { .cgpt-page { gap: 24px; } .cgpt-row { align-items: flex-start; } .cgpt-controls { justify-content: flex-start; margin-left: 0; } }
@@ -180,7 +184,7 @@ module.exports = {
 
       // 加载状态 + 轮询
       var load = React.useCallback(function () {
-        rpc('getCodexBridgeStatus').then(function (s) { setStatus(s); }).catch(function (e) { setStatus({ ok: false, error: { message: '获取状态失败' } }); });
+        rpc('getCodexBridgeStatus').then(function (s) { setStatus(s); }).catch(function (e) { setStatus({ ok: false, error: { message: '读取状态失败，请刷新页面重试' } }); });
       }, []);
 
       React.useEffect(function () {
@@ -201,7 +205,7 @@ module.exports = {
         setAuthorizing(true);
         rpc('startCodexOAuth').then(function (res) {
           if (!res.ok) {
-            alert('启动授权失败：' + (res.error && res.error.message || '未知错误'));
+            alert('没法开始绑定：' + (res.error && res.error.message || '未知原因'));
             setAuthorizing(false);
             return;
           }
@@ -224,16 +228,16 @@ module.exports = {
             });
           }, 2000);
         }).catch(function (e) {
-          alert('启动授权异常：' + e.message);
+          alert('绑定时出错：' + e.message);
           setAuthorizing(false);
         });
       }, [authorizing]);
 
       // 解绑
       var handleUnbind = React.useCallback(function () {
-        if (!confirm('确定要解绑 ChatGPT 订阅吗？')) return;
+        if (!confirm('确定要解绑吗？\n\n解绑后本机保存的 ChatGPT 登录信息会被删除，需要重新登录一次才能继续用。')) return;
         rpc('unbindCodex').then(function (res) {
-          if (res.ok) { load(); } else { alert('解绑失败：' + (res.error && res.error.message || '')); }
+          if (res.ok) { load(); } else { alert('解绑失败：' + (res.error && res.error.message || '请重试')); }
         });
       }, [load]);
 
@@ -257,9 +261,11 @@ module.exports = {
       var head = h('div', { className: 'cgpt-sectionHead' },
         h('h4', { className: 'cgpt-title' }, 'ChatGPT 订阅'),
         h('span', { className: 'cgpt-sectionCount' }, 'DeepSeek Harness 插件'));
-      var intro = h('p', { className: 'cgpt-intro' }, '绑定后可在 DSH 中使用 ChatGPT Plus/Pro 订阅额度对话，并在底部信息栏查看剩余额度与重置时间。');
-      var note = h('p', { className: 'cgpt-note' },
-        '说明：绑定由官方 OAuth 流程完成，令牌存储在 ~/.codex/auth.json（0600）。独立插件 dsh-chatgpt-subscription 负责维护令牌，dsh-bottom-info-bar 只读令牌显示额度。本插件不管理联网搜索配置：搜索商由 DSH 的搜索配置单独指定（如 DeepSeek 搜索或第三方搜索服务），ChatGPT 订阅令牌绝不会被当作搜索凭据使用。');
+      var intro = h('p', { className: 'cgpt-intro' }, '把你自己的 ChatGPT 账号绑到这里，就能在 DSH 里直接用 ChatGPT 模型聊天，用量算在你自己的订阅额度上。');
+      var note = h('p', { className: 'cgpt-note cgpt-note--pre' },
+        '怎么工作的：点「绑定 ChatGPT 账号」会打开 OpenAI 官方登录页，你登录后，登录信息只存在这台电脑上，不经过任何第三方服务器。\n'
+        + '解绑会清掉本机保存的登录信息，并把默认模型切回原来的那个。\n'
+        + '联网搜索是 DSH 单独配置的，跟这里的订阅账号没有关系。');
 
       if (!status) {
         return h('div', { className: 'cgpt-page' },
@@ -270,34 +276,57 @@ module.exports = {
       var bound = status.bound;
       var errorMsg = (status.error && status.error.message) || '';
 
-      // 状态行：标题 + 说明在左，控件靠右——与信息栏设置面板同一套行结构
-      var statusDesc = bound
-        ? (status.expiresAt
-          ? ('令牌有效期至 ' + fmtTime(status.expiresAt) + '（剩余 ' + fmtCountdown(status.expiresAt - Date.now()) + '）')
-          : '令牌已绑定，暂未读到有效期。')
-        : '尚未绑定。绑定后底部信息栏会显示订阅额度与重置时间。';
-      var statusControls = bound
-        ? [
-          h('span', { className: 'cgpt-status', key: 'state' }, cgptStateDot('done'), cgptStatusTag('已绑定', 'success')),
-          cgptButton({ key: 'reauth', className: '', onClick: handleAuthorize, disabled: authorizing, children: authorizing ? '授权中…' : '重新授权' }),
+      // 三态：未绑定（中性引导）/ 已连接（绿）/ 需要注意（红，绑定还在但状态异常）。
+      // 未绑定绝不显示红字——那不是错误，是正常起点。
+      var needsAttention = bound && !!errorMsg;
+      var bindLabel = authorizing ? '正在打开浏览器…' : '绑定 ChatGPT 账号';
+
+      var accountDesc = null;
+      if (bound && status.account) {
+        var parts = [];
+        if (status.account.email) parts.push(status.account.email);
+        if (status.account.plan) parts.push(status.account.plan + ' 套餐');
+        accountDesc = parts.length > 0 ? parts.join(' · ') : '暂时读不到账号信息（不影响使用）';
+      }
+
+      var statusDesc = !bound
+        ? '还没绑定。点右边的按钮，会打开 OpenAI 官方登录页，登录一次就好。'
+        : needsAttention
+          ? '绑定还在，但状态不正常，请看下面的红色提示。'
+          : (status.expiresAt
+            ? ('已连接，登录有效期到 ' + fmtTime(status.expiresAt) + '（还剩 ' + fmtCountdown(status.expiresAt - Date.now()) + '）')
+            : '已连接。');
+
+      var statusControls = !bound
+        ? [cgptButton({ key: 'auth', variant: 'primary', onClick: handleAuthorize, disabled: authorizing, children: bindLabel })]
+        : [
+          h('span', { className: 'cgpt-status', key: 'state' }, cgptStateDot(needsAttention ? 'error' : 'done'), cgptStatusTag(needsAttention ? '需要注意' : '已连接', needsAttention ? 'danger' : 'success')),
+          cgptButton({ key: 'reauth', className: '', onClick: handleAuthorize, disabled: authorizing, children: authorizing ? '正在打开浏览器…' : '重新绑定' }),
           cgptButton({ key: 'unbind', className: 'cgpt-btn--danger', onClick: handleUnbind, children: '解绑' }),
-        ]
-        : [cgptButton({ key: 'auth', variant: 'primary', onClick: handleAuthorize, disabled: authorizing, children: authorizing ? '授权中…' : '授权登录' })];
+        ];
 
-      var rows = [
-        hList('div', { className: 'cgpt-row', key: 'status' }, [
+      var rows = [];
+      if (accountDesc) {
+        rows.push(hList('div', { className: 'cgpt-row', key: 'account' }, [
           h('div', { className: 'cgpt-rowText' },
-            h('div', { className: 'cgpt-rowTitle' }, '订阅状态'),
-            h('div', { className: 'cgpt-rowDesc' }, statusDesc)),
-          hList('div', { className: 'cgpt-controls' }, statusControls),
-        ]),
-      ];
+            h('div', { className: 'cgpt-rowTitle' }, '绑定账号'),
+            h('div', { className: 'cgpt-rowDesc' }, accountDesc)),
+        ]));
+      }
+      rows.push(hList('div', { className: 'cgpt-row', key: 'status' }, [
+        h('div', { className: 'cgpt-rowText' },
+          h('div', { className: 'cgpt-rowTitle' }, '使用状态'),
+          h('div', { className: 'cgpt-rowDesc' }, statusDesc)),
+        hList('div', { className: 'cgpt-controls' }, statusControls),
+      ]));
 
-      // 错误：照宿主 .X_2TxG_failure / .X_2TxG_reason 的形态——独立整块、错误色、12/18、
-      // 可任意换行；不再是把「错误」两个字单独占一行、正文甩到下面几百像素外的松散排布。
+      // 错误块自带「重新绑定」按钮：看到红字就能直接动手，不用自己找入口。
       var alerts = [];
-      if (errorMsg) {
-        alerts.push(h('p', { className: 'cgpt-alert cgpt-alert--error', key: 'err', role: 'alert' }, errorMsg));
+      if (needsAttention) {
+        alerts.push(h('div', { className: 'cgpt-alert cgpt-alert--error', key: 'err', role: 'alert' },
+          h('span', { className: 'cgpt-alertText' }, errorMsg),
+          h('span', { className: 'cgpt-alertActions' },
+            cgptButton({ key: 'fix', variant: 'primary', onClick: handleAuthorize, disabled: authorizing, children: authorizing ? '正在打开浏览器…' : '重新绑定' }))));
       }
 
       return h('div', { className: 'cgpt-page' },
@@ -311,7 +340,7 @@ module.exports = {
 
     function SubscriptionBundleConfig(props) {
       if (props && props.view === 'summary') {
-        return h('span', { className: 'dshChatGPTBundleSummary' }, '绑定 ChatGPT Plus/Pro 订阅，在 DSH 中使用 ChatGPT 模型。');
+        return h('span', { className: 'dshChatGPTBundleSummary' }, '绑定你自己的 ChatGPT 账号，在 DSH 里用 ChatGPT 模型聊天。');
       }
       return h(SubscriptionPage, props);
     }
