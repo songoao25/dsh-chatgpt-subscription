@@ -40,6 +40,58 @@ module.exports = {
       for (var i = 2; i < arguments.length; i++) args.push(arguments[i]);
       return React.createElement.apply(React, args);
     }
+    // 同 h，但 children 以数组给出——逐项展开成可变参数，
+    // 避免把数组当唯一子节点（那会要求每个元素带 key，且会多套一层隐式 key 警告）。
+    function hList(tag, props, children) {
+      var args = [tag, props];
+      for (var i = 0; i < children.length; i++) {
+        if (children[i]) args.push(children[i]);
+      }
+      return React.createElement.apply(React, args);
+    }
+
+    // ---------- 样式 ----------
+    // 与 dsh-bottom-info-bar 的设置面板同一套观感，并直接对齐 DSH 原生设置页：
+    // 扁平列表 + .5px 细分隔线 + 原生字号阶梯（14/20 标题、12/18 次要说明）+ 原生控件尺寸。
+    // 全部走 --dsw-alias-* 令牌，深色/浅色主题自动跟随。
+    function installStyles() {
+      var id = 'dsh-chatgpt-subscription-page';
+      if (document.querySelector('style[data-plugin-css="' + id + '"]') !== null) return;
+      var style = document.createElement('style');
+      style.dataset.plugin = 'dsh-chatgpt-subscription';
+      style.dataset.pluginCss = id;
+      style.textContent = `
+        .cgpt-page { display: flex; flex-direction: column; width: 100%; max-width: 760px; min-width: 0; gap: 12px; color: var(--dsw-alias-label-primary); }
+        .cgpt-page, .cgpt-page * { box-sizing: border-box; }
+        .cgpt-title { width: 100%; margin: 0; font-size: 18px; font-weight: 600; line-height: 26px; color: var(--dsw-alias-label-primary); }
+        .cgpt-intro { width: 100%; margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 13px; line-height: 20px; }
+        .cgpt-list { display: flex; flex-direction: column; width: 100%; min-width: 0; }
+        .cgpt-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-width: 0; padding: 16px 0; border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
+        .cgpt-row:last-child { border-bottom: none; }
+        .cgpt-rowText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .cgpt-rowTitle { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 400; line-height: 22px; color: var(--dsw-alias-label-primary); }
+        .cgpt-rowDesc { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; }
+        .cgpt-rowDesc--error { color: var(--dsw-alias-state-error-primary, var(--dsw-alias-label-error, #d92d20)); }
+        .cgpt-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; margin-left: auto; }
+        .cgpt-status { display: inline-flex; align-items: center; gap: 6px; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; }
+        .cgpt-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--dsw-alias-state-success-primary, var(--dsw-alias-label-success, #087f5b)); }
+        /* 按钮取宿主 primitives 的 SettingsForm .save 尺寸（r8 / 13px / 5px 14px） */
+        .cgpt-btn { appearance: none; font: inherit; cursor: pointer; border: 0.5px solid var(--dsw-alias-border-l3); color: var(--dsw-alias-label-primary); background: transparent; border-radius: 8px; padding: 5px 14px; font-size: 13px; font-weight: 500; line-height: 1.5; transition: background-color 120ms ease, border-color 120ms ease; }
+        .cgpt-btn:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover, rgba(128,128,128,0.08)); }
+        .cgpt-btn:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
+        .cgpt-btn:disabled { opacity: 0.4; cursor: default; }
+        .cgpt-btn--primary { border-color: transparent; background: var(--dsw-alias-label-primary); color: var(--dsw-alias-bg-layer-3); }
+        .cgpt-btn--primary:hover:not(:disabled) { background: var(--dsw-alias-label-primary); opacity: 0.9; }
+        .cgpt-btn--danger { border-color: var(--dsw-alias-state-error-primary, var(--dsw-alias-label-error, #d92d20)); color: var(--dsw-alias-state-error-primary, var(--dsw-alias-label-error, #d92d20)); }
+        .cgpt-btn--danger:hover:not(:disabled) { background: var(--dsw-alias-state-error-bg-primary, rgba(217,45,32,0.08)); border-color: var(--dsw-alias-state-error-primary, var(--dsw-alias-label-error, #d92d20)); }
+        .cgpt-note { width: 100%; margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+        .cgpt-loading { margin: 0; padding: 16px 0; color: var(--dsw-alias-label-tertiary); font-size: 13px; line-height: 20px; }
+        @media (max-width: 600px) { .cgpt-row { align-items: flex-start; } .cgpt-controls { justify-content: flex-start; margin-left: 0; } }
+        @media (prefers-reduced-motion: reduce) { .cgpt-btn { transition: none; } }
+      `;
+      document.head.appendChild(style);
+    }
+    installStyles();
 
     // ---------- 插件配置页组件 ----------
     function SubscriptionPage(props) {
@@ -126,40 +178,48 @@ module.exports = {
         return h > 0 ? h + 'h' + p(m) + 'm' : p(m) + ':' + p(s);
       }
 
-      var style = { maxWidth: 720, margin: '0 auto', padding: '1rem' };
-      var cardStyle = { border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 12, padding: '1rem 1.2rem', marginBottom: '1rem', background: 'var(--dsw-alias-bg-module-platform)' };
-      var btnPrimary = { background: 'var(--dsw-alias-button-primary-fill)', color: 'var(--dsw-alias-label-primary-foreground)', border: 'none', borderRadius: 18, padding: '0 1.2rem', height: 36, cursor: 'pointer', fontSize: 14 };
-      var btnDanger = { background: 'transparent', color: 'var(--dsw-alias-state-error-primary)', border: '1px solid var(--dsw-alias-state-error-primary)', borderRadius: 18, padding: '0 1rem', height: 32, cursor: 'pointer', fontSize: 13 };
-      var btnSecondary = { background: 'transparent', color: 'var(--dsw-alias-label-primary)', border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 18, padding: '0 1rem', height: 32, cursor: 'pointer', fontSize: 13 };
+      var title = h('h2', { className: 'cgpt-title' }, 'ChatGPT 订阅');
+      var intro = h('p', { className: 'cgpt-intro' }, '绑定后可在 DSH 中使用 ChatGPT Plus/Pro 订阅额度对话，并在底部信息栏查看剩余额度与重置时间。');
+      var note = h('p', { className: 'cgpt-note' },
+        '说明：绑定由官方 OAuth 流程完成，令牌存储在 ~/.codex/auth.json（0600）。独立插件 dsh-chatgpt-subscription 负责维护令牌，dsh-bottom-info-bar 只读令牌显示额度。本插件不管理联网搜索配置：搜索商由 DSH 的搜索配置单独指定（如 DeepSeek 搜索或第三方搜索服务），ChatGPT 订阅令牌绝不会被当作搜索凭据使用。');
 
-      if (!status) return h('div', { style: style }, h('p', null, '加载中…'));
+      if (!status) {
+        return h('div', { className: 'cgpt-page' }, title, intro, h('p', { className: 'cgpt-loading' }, '加载中…'));
+      }
 
       var bound = status.bound;
       var errorMsg = (status.error && status.error.message) || '';
 
-      return h('div', { style: style },
-        h('h2', { style: { marginTop: 0, fontSize: 18, fontWeight: 500 } }, 'ChatGPT 订阅'),
-        h('div', { style: cardStyle },
-          !bound ? h('div', null,
-            h('p', { style: { color: 'var(--dsw-alias-label-tertiary)', fontSize: 14 } }, '绑定后可在 DSH 中使用 ChatGPT Plus/Pro 订阅额度对话，并在底部信息栏查看剩余额度与重置时间。'),
-            h('button', { style: Object.assign({}, btnPrimary, { marginTop: '0.5rem' }), onClick: handleAuthorize, disabled: authorizing }, authorizing ? '授权中…' : '授权登录'),
-            errorMsg ? h('p', { style: { color: 'var(--dsw-alias-state-error-primary)', fontSize: 13, marginTop: '0.5rem' } }, errorMsg) : null
-          ) : h('div', null,
-            h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.8rem' } },
-              h('span', { style: { width: 8, height: 8, borderRadius: '50%', background: 'var(--dsw-alias-state-success-primary)', display: 'inline-block' } }),
-              h('strong', null, '已绑定')
-            ),
-            status.expiresAt ? h('p', { style: { fontSize: 13, color: 'var(--dsw-alias-label-secondary)' } }, '令牌有效期至：' + fmtTime(status.expiresAt) + '（剩余 ' + fmtCountdown(status.expiresAt - Date.now()) + '）') : null,
-            h('div', { style: { display: 'flex', gap: 8, marginTop: '1rem' } },
-              h('button', { style: btnSecondary, onClick: handleAuthorize, disabled: authorizing }, '重新授权'),
-              h('button', { style: btnDanger, onClick: handleUnbind }, '解绑')
-            )
-          )
-        ),
-        h('p', { style: { fontSize: 12, color: 'var(--dsw-alias-label-tertiary)', marginTop: '1rem' } },
-          '说明：绑定由官方 OAuth 流程完成，令牌存储在 ~/.codex/auth.json（0600）。独立插件 dsh-chatgpt-subscription 负责维护令牌，dsh-bottom-info-bar 只读令牌显示额度。本插件不管理联网搜索配置：搜索商由 DSH 的搜索配置单独指定（如 DeepSeek 搜索或第三方搜索服务），ChatGPT 订阅令牌绝不会被当作搜索凭据使用。'
-        )
-      );
+      // 状态行：标题 + 说明在左，控件靠右——与信息栏设置面板同一套行结构
+      var statusDesc = bound
+        ? (status.expiresAt
+          ? ('令牌有效期至 ' + fmtTime(status.expiresAt) + '（剩余 ' + fmtCountdown(status.expiresAt - Date.now()) + '）')
+          : '令牌已绑定，暂未读到有效期。')
+        : '尚未绑定。绑定后底部信息栏会显示订阅额度与重置时间。';
+      var statusControls = bound
+        ? [
+          h('span', { className: 'cgpt-status', key: 'state' }, h('span', { className: 'cgpt-dot' }), '已绑定'),
+          h('button', { className: 'cgpt-btn', key: 'reauth', onClick: handleAuthorize, disabled: authorizing }, authorizing ? '授权中…' : '重新授权'),
+          h('button', { className: 'cgpt-btn cgpt-btn--danger', key: 'unbind', onClick: handleUnbind }, '解绑'),
+        ]
+        : [h('button', { className: 'cgpt-btn cgpt-btn--primary', key: 'auth', onClick: handleAuthorize, disabled: authorizing }, authorizing ? '授权中…' : '授权登录')];
+
+      var rows = [
+        hList('div', { className: 'cgpt-row', key: 'status' }, [
+          h('div', { className: 'cgpt-rowText' },
+            h('div', { className: 'cgpt-rowTitle' }, '订阅状态'),
+            h('div', { className: 'cgpt-rowDesc' }, statusDesc)),
+          hList('div', { className: 'cgpt-controls' }, statusControls),
+        ]),
+      ];
+      if (errorMsg) {
+        rows.push(h('div', { className: 'cgpt-row', key: 'error' },
+          h('div', { className: 'cgpt-rowText' },
+            h('div', { className: 'cgpt-rowTitle' }, '错误'),
+            h('div', { className: 'cgpt-rowDesc cgpt-rowDesc--error' }, errorMsg))));
+      }
+
+      return h('div', { className: 'cgpt-page' }, title, intro, hList('div', { className: 'cgpt-list' }, rows), note);
     }
 
     function SubscriptionBundleConfig(props) {
