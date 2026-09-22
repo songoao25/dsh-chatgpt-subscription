@@ -1,7 +1,7 @@
 {
   "name": "dsh-chatgpt-subscription",
   "version": "0.2.1",
-  "description": "DeepSeek Harness (DSH) 插件：用官方 OAuth 一键绑定 ChatGPT 订阅（Codex），在 DSH 插件页查看绑定状态与剩余额度，并直接使用 ChatGPT 模型对话。",
+  "description": "把你的 ChatGPT 账号绑进 DSH：登录一次，就能在 DSH 里直接用 ChatGPT 模型聊天，底部信息栏会显示剩余额度。",
   "keywords": [
     "deepseek-harness",
     "dsh",

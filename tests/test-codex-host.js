@@ -84,12 +84,17 @@ function extractModule(nameList, depOverrides) {
   )
 }
 
+const CODEX_JWT_ACCOUNT_CLAIM = 'https://api.openai.com/auth' // 与 src/host.js 同名常量保持一致（JWT 账号声明命名空间）
+
 // 提取纯函数（同一共享作用域）
 const fnNames = [
   'decodeBase64Url', 'decodeJwtExp', 'codexExpiresAt', 'codexNeedsRefresh',
   'readCodexAuthFile', 'writeAuthJson', 'readBindFlag', 'writeBindFlag', 'clearBindFlag',
   'createPkcePair', 'buildAuthorizeUrl', 'parseCallbackUrl', 'oauthCallbackPort',
   'codexAccountIdFromJwt', 'buildOAuthAuthObject', 'routingModeFor',
+  'readSettingsSection', 'settingsServiceReady',
+  'decodeJwtPayload', 'codexIsTokenExpired', 'classifyCodexCredential',
+  'withCredentialManaged', 'maskEmail', 'codexAccountSummary', 'planDisplayName',
 ]
 const mod = extractModule(fnNames)
 const {
@@ -97,6 +102,9 @@ const {
   readCodexAuthFile, writeAuthJson, readBindFlag, writeBindFlag, clearBindFlag,
   createPkcePair, buildAuthorizeUrl, parseCallbackUrl, oauthCallbackPort,
   codexAccountIdFromJwt, buildOAuthAuthObject, routingModeFor,
+  readSettingsSection, settingsServiceReady,
+  decodeJwtPayload, codexIsTokenExpired, classifyCodexCredential,
+  withCredentialManaged, maskEmail, codexAccountSummary, planDisplayName,
 } = mod
 
 // 环境变量隔离（测试前设置）
@@ -138,6 +146,89 @@ function makeJwt(claims) {
   check('健康绑定 + DeepSeek → DeepSeek 模式', routingModeFor(true, true, 'deepseek-official'), 'deepseek')
   check('令牌失效 + ChatGPT 选择 → DeepSeek 模式', routingModeFor(true, false, 'openai-codex'), 'deepseek')
   check('未绑定 + ChatGPT 选择 → DeepSeek 模式', routingModeFor(false, true, 'openai-codex'), 'deepseek')
+}
+
+// ---- 测试 2c：settings 服务跨版本读取（0.1.7 移除 get(ns)，只剩 describe()） ----
+// 回归背景：旧代码只认 settings.get，新宿主上没有这个函数 → ensureCodexRoute 直接
+// 早退成「settings 服务未就绪，下个周期重试」，绑定 ChatGPT 后路由永远注册不上。
+{
+  const section = { providers: { 'openai-codex': { apiKeyEnv: 'OPENAI_CODEX_API_KEY' } } }
+  // 新宿主：describe() 返回描述数组，按 ns 定位
+  const newHost = { describe: () => [{ ns: 'llm-deepseek', value: {} }, { ns: 'llm-pi-ai', value: section }], mutate: () => {} }
+  check('新宿主 describe() 能读到 llm-pi-ai', readSettingsSection(newHost, 'llm-pi-ai'), section)
+  check('新宿主 describe() 缺该节 → undefined', readSettingsSection(newHost, 'ui-theme'), undefined)
+  check('新宿主 readiness = true', settingsServiceReady(newHost), true)
+  // 旧宿主：只有 get(ns)
+  const oldHost = { get: (ns) => (ns === 'llm-pi-ai' ? section : undefined), mutate: () => {} }
+  check('旧宿主 get(ns) 兜底可用', readSettingsSection(oldHost, 'llm-pi-ai'), section)
+  check('旧宿主 readiness = true', settingsServiceReady(oldHost), true)
+  // describe() 抛错时回落 get(ns)，不崩
+  const brokenDescribe = { describe: () => { throw new Error('boom') }, get: () => section, mutate: () => {} }
+  check('describe() 抛错 → 回落 get(ns)', readSettingsSection(brokenDescribe, 'llm-pi-ai'), section)
+  // describe() 回畸形值时不崩
+  check('describe() 回非数组 → undefined（无 get 时）', readSettingsSection({ describe: () => 'nope' }, 'llm-pi-ai'), undefined)
+  check('get(ns) 抛错 → undefined', readSettingsSection({ get: () => { throw new Error('boom') } }, 'llm-pi-ai'), undefined)
+  // readiness 闸门：能读但不会写 / 什么都不会，都判为未就绪
+  check('只有读能力、无 mutate → 未就绪（防止写不进去还宣称成功）', settingsServiceReady({ describe: () => [] }), false)
+  check('空对象 → 未就绪', settingsServiceReady({}), false)
+  check('null / undefined → 未就绪', [settingsServiceReady(null), settingsServiceReady(undefined)], [false, false])
+}
+
+// ---- 测试 2d：凭据归属判定（红字死锁的根治点） ----
+// 回归背景：v0.1.0 的绑定标记没有「凭据归本插件所有」一栏，旧判定「槽位非空即他人所有」
+// 把插件自己早期注入的令牌当成别人的，永久拒绝更新 —— 2026-08-20 起常驻红字。
+// 判定必须建立在可自证的证据上，而不是历史记账是否齐全。
+{
+  const now = Math.floor(Date.now() / 1000)
+  const acctA = makeJwt({ exp: now + 86400, [CODEX_JWT_ACCOUNT_CLAIM]: { chatgpt_account_id: 'acct-A' } })
+  const acctB = makeJwt({ exp: now + 86400, [CODEX_JWT_ACCOUNT_CLAIM]: { chatgpt_account_id: 'acct-B' } })
+  const staleA = makeJwt({ exp: now - 86400, [CODEX_JWT_ACCOUNT_CLAIM]: { chatgpt_account_id: 'acct-A' } })
+
+  check('槽位为空 → 可接管（首次注入）', classifyCodexCredential('', acctA, {}), { claim: true, reason: 'empty' })
+  check('进程内已确认归属 → 可接管', classifyCodexCredential(acctB, acctA, { ownedInProcess: true }), { claim: true, reason: 'owned' })
+  check('账本记了归属 → 可接管', classifyCodexCredential(acctB, acctA, { managed: true }), { claim: true, reason: 'managed' })
+  check('无候选令牌 → 拒绝', classifyCodexCredential(acctB, '', {}), { claim: false, reason: 'no-candidate' })
+  check('逐字节同值 → 认定为同源', classifyCodexCredential(acctA, acctA, {}), { claim: true, reason: 'same-value' })
+  check('同一 ChatGPT 账号 → 认定为同源', classifyCodexCredential(staleA, acctA, { boundFlag: true, nowSeconds: now }), { claim: true, reason: 'same-account' })
+  check('同一账号判定优先于过期判定', classifyCodexCredential(staleA, acctA, { boundFlag: true, nowSeconds: now }).reason, 'same-account')
+  check('不同账号 → 拒绝（绝不覆盖他人凭据）', classifyCodexCredential(acctB, acctA, { boundFlag: true, nowSeconds: now }), { claim: false, reason: 'other' })
+  check('已绑定 + 槽内过期 + 新的有效 → 可接管', classifyCodexCredential(makeJwt({ exp: now - 10 }), acctA, { boundFlag: true, nowSeconds: now }), { claim: true, reason: 'expired-stale' })
+  check('槽内过期但新的也过期 → 拒绝', classifyCodexCredential(makeJwt({ exp: now - 20 }), makeJwt({ exp: now - 10 }), { boundFlag: true, nowSeconds: now }), { claim: false, reason: 'other' })
+  check('未绑定时不走过期接管（保守）', classifyCodexCredential(makeJwt({ exp: now - 10 }), acctA, { boundFlag: false, nowSeconds: now }), { claim: false, reason: 'other' })
+}
+
+// ---- 测试 2e：账本迁移（旧标记补齐 ownership 一栏） ----
+{
+  const oldFlag = { ok: true, bound: true, boundAt: '2026-08-20T00:00:00.000Z', routeOwned: true, defaultModelManaged: false, previousDefaultModel: null }
+  const migrated = withCredentialManaged(oldFlag)
+  check('迁移后标记归属', migrated.credentialManaged, true)
+  check('迁移保留路由所有权', migrated.routeOwned, true)
+  check('迁移保留首次绑定时间', migrated.boundAt, '2026-08-20T00:00:00.000Z')
+  check('迁移对空对象也成立', withCredentialManaged(null).credentialManaged, true)
+  check('迁移后 boundAt 非空', typeof withCredentialManaged(null).boundAt, 'string')
+}
+
+// ---- 测试 2f：页面展示脱敏（完整邮箱绝不出 host） ----
+{
+  check('maskEmail 正常邮箱', maskEmail('songsong@gmail.com'), 'so•••@gmail.com')
+  check('maskEmail 短本地部分', maskEmail('a@gmail.com'), 'a•••@gmail.com')
+  check('maskEmail 非法 → null', maskEmail('not-an-email'), null)
+  check('maskEmail 空 → null', maskEmail(''), null)
+  check('maskEmail 非字符串 → null', maskEmail(null), null)
+  check('planDisplayName plus', planDisplayName('plus'), 'Plus')
+  check('planDisplayName 未知档位原样返回', planDisplayName('ultra'), 'ultra')
+  check('planDisplayName 空 → null', planDisplayName(''), null)
+  const now = Math.floor(Date.now() / 1000)
+  const idTok = makeJwt({
+    exp: now + 86400,
+    email: 'songsong@gmail.com',
+    [CODEX_JWT_ACCOUNT_CLAIM]: { chatgpt_account_id: 'acct-A', chatgpt_plan_type: 'plus' },
+  })
+  const summary = codexAccountSummary({ tokens: { id_token: idTok, access_token: makeJwt({ exp: now + 86400 }) } })
+  check('账号摘要邮箱已脱敏', summary.email, 'so•••@gmail.com')
+  check('账号摘要套餐可读', summary.plan, 'plus')
+  check('账号摘要不含完整邮箱', JSON.stringify(summary).includes('songsong@gmail.com'), false)
+  check('无令牌时摘要不崩', codexAccountSummary({}), { email: null, plan: null })
 }
 
 // ---- 测试 3：绑定标记 ----
@@ -230,17 +321,34 @@ function makeJwt(claims) {
   check('host 不管理搜索配置', !src.includes('SEARCH_SETTINGS_NAMESPACE') && !src.includes('setSearchMode'), true)
   check('host 包含单飞保护', src.includes('syncInFlight'), true)
   check('host 包含默认模型回滚保护', src.includes('restoreDefaultModel'), true)
-  check('host 拒绝自定义同名路由覆盖', src.includes('apiKeyEnv 不是 OPENAI_CODEX_API_KEY'), true)
+  check('host 拒绝自定义同名路由覆盖', src.includes("existing.apiKeyEnv !== 'OPENAI_CODEX_API_KEY'") && src.includes('MSG_ROUTE_CONFLICT'), true)
   check('host 解绑移除自有路由', src.includes("path: ['providers', 'openai-codex'] }]"), true)
   check('host 不删除用户已有 Codex 路由', src.includes('同名用户路由只读不删不改'), true)
   check('host 只清理自有 Codex 凭据', src.includes('codexCredentialOwned') && src.includes('credentialManaged'), true)
-  check('host 覆盖前检查已有 Codex 凭据', src.includes('canClaimCodexCredential') && src.includes('credentials-conflict'), true)
+  check('host 覆盖前检查已有 Codex 凭据', src.includes('classifyCodexCredentialSlot') && src.includes('credentials-conflict'), true)
+  // 回归：归属判定不能退化成「槽位非空即他人所有」，否则插件会把自己早期注入的令牌锁在门外
+  check('host 归属判定基于可自证证据', src.includes('classifyCodexCredential'), true)
+  check('host 接管后补记账本（防复发）', src.includes('withCredentialManaged(flag)'), true)
+  check('host 不再残留旧的空槽即放行判定', src.includes('canClaimCodexCredential('), false)
   check('host 失效状态清理 Codex 凭据', (src.match(/clearInjectedCodexCredential\(flag\)/g) || []).length >= 4, true)
   check('OAuth 启动 RPC 受同源保护', src.includes('MUTATING = { startCodexOAuth: true'), true)
   check('ChatGPT 默认模型使用明确配置', src.includes('CODEX_DEFAULT_MODEL'), true)
   check('客户端 RPC 检查 HTTP 状态', clientSrc.includes("if (!r.ok) throw new Error"), true)
   check('客户端卸载清理授权轮询', clientSrc.includes('pollRef.current'), true)
   check('未绑定启动不主动注册 ChatGPT 路由', !src.includes('    ensureCodexRoute();\n    syncCodexToken();'), true)
+  check('host 读 llm-pi-ai 一律经 readSettingsSection（0.1.7 起 settings.get 已被移除）',
+    src.includes("readSettingsSection(settings, 'llm-pi-ai')") && !src.includes("settings.get('llm-pi-ai')"), true)
+  check('host 的 settings 就绪判定兼容两代宿主（describe 或 get）',
+    src.includes('function settingsServiceReady(settings)') && src.includes('return typeof settings.describe'), true)
+}
+
+// ---- 测试 N：源码可解析（2026-09-22 回归：括号错位只炸运行时 import，函数级抽取测试测不到） ----
+{
+  const { spawnSync } = await import('node:child_process')
+  for (const f of ['src/host.js', 'src/client-bundle.js']) {
+    const r = spawnSync(process.execPath, ['--check', join(root, f)], { encoding: 'utf8' })
+    check(`源码可解析 ${f}`, r.status, 0)
+  }
 }
 
 // 清理临时文件
