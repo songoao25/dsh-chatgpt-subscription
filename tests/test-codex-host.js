@@ -10,7 +10,6 @@ import { createHash, randomBytes } from 'node:crypto'
 const root = dirname(fileURLToPath(new URL('../package.json', import.meta.url)))
 const src = readFileSync(join(root, 'src', 'host.js'), 'utf8')
 const clientSrc = readFileSync(join(root, 'src', 'client-bundle.js'), 'utf8')
-const patchSrc = readFileSync(join(root, 'cordis.patch.yml'), 'utf8')
 
 // ---- 简易断言（脱敏：涉及 token/auth/secret 的断言失败时不打印实际值）----
 let pass = 0
@@ -228,8 +227,7 @@ function makeJwt(claims) {
   check('host 无个人路径', src.includes(['/Users', 'probe'].join('/')), false)
   check('host env 前缀 DSH_CHATGPT', src.includes('DSH_CHATGPT'), true)
   check('host 不读取或删除 DeepSeek 密钥值', src.includes('ctx.credentials.resolve(\'DEEPSEEK_API_KEY\')'), false)
-  check('host 只切换 DeepSeek 搜索凭据引用', src.includes("SEARCH_SETTINGS_NAMESPACE = 'web-search-deepseek'") && src.includes('DEEPSEEK_SEARCH_KEY_REF'), true)
-  check('host ChatGPT 搜索 fail closed', src.includes('CHATGPT_SEARCH_DISABLED_KEY_REF'), true)
+  check('host 不管理搜索配置', !src.includes('SEARCH_SETTINGS_NAMESPACE') && !src.includes('setSearchMode'), true)
   check('host 包含单飞保护', src.includes('syncInFlight'), true)
   check('host 包含默认模型回滚保护', src.includes('restoreDefaultModel'), true)
   check('host 拒绝自定义同名路由覆盖', src.includes('apiKeyEnv 不是 OPENAI_CODEX_API_KEY'), true)
@@ -242,9 +240,6 @@ function makeJwt(claims) {
   check('ChatGPT 默认模型使用明确配置', src.includes('CODEX_DEFAULT_MODEL'), true)
   check('客户端 RPC 检查 HTTP 状态', clientSrc.includes("if (!r.ok) throw new Error"), true)
   check('客户端卸载清理授权轮询', clientSrc.includes('pollRef.current'), true)
-  check('插件保留 DeepSeek 搜索 provider 供模式恢复', patchSrc.includes('DEEPSEEK_API_KEY') && !patchSrc.includes('disabled: true'), true)
-  check('绑定和解绑都切换搜索线路', (src.match(/setSearchMode\(/g) || []).length >= 4, true)
-  check('手动模型选择通过轮询同步搜索线路', src.includes('ROUTING_SYNC_INTERVAL_MS') && src.includes('syncRoutingMode'), true)
   check('未绑定启动不主动注册 ChatGPT 路由', !src.includes('    ensureCodexRoute();\n    syncCodexToken();'), true)
 }
 

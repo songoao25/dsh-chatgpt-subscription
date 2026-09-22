@@ -2,24 +2,24 @@
 
 [**English**](README.md) | **中文**
 
-[![License: MIT](https://img.shields.io/github/license/songoao25/dsh-chatgpt-subscription)](https://github.com/songoao25/dsh-chatgpt-subscription/blob/main/LICENSE)
-[![Release](https://img.shields.io/github/v/release/songoao25/dsh-chatgpt-subscription)](https://github.com/songoao25/dsh-chatgpt-subscription/releases)
-[![CI](https://img.shields.io/github/actions/workflow/status/songoao25/dsh-chatgpt-subscription/ci.yml)](https://github.com/songoao25/dsh-chatgpt-subscription/actions)
-[![Last Commit](https://img.shields.io/github/last-commit/songoao25/dsh-chatgpt-subscription)](https://github.com/songoao25/dsh-chatgpt-subscription)
-[![Stars](https://img.shields.io/github/stars/songoao25/dsh-chatgpt-subscription)](https://github.com/songoao25/dsh-chatgpt-subscription)
-[![Dependabot](https://img.shields.io/badge/dependabot-enabled-025e8c?logo=dependabot)](https://github.com/songoao25/dsh-chatgpt-subscription/security/dependabot)
+[![License: MIT](https://img.shields.io/github/license/SONGOAO25/dsh-chatgpt-subscription)](https://github.com/SONGOAO25/dsh-chatgpt-subscription/blob/main/LICENSE)
+[![Release](https://img.shields.io/github/v/release/SONGOAO25/dsh-chatgpt-subscription)](https://github.com/SONGOAO25/dsh-chatgpt-subscription/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/SONGOAO25/dsh-chatgpt-subscription/ci.yml)](https://github.com/SONGOAO25/dsh-chatgpt-subscription/actions)
+[![Last Commit](https://img.shields.io/github/last-commit/SONGOAO25/dsh-chatgpt-subscription)](https://github.com/SONGOAO25/dsh-chatgpt-subscription)
+[![Stars](https://img.shields.io/github/stars/SONGOAO25/dsh-chatgpt-subscription)](https://github.com/SONGOAO25/dsh-chatgpt-subscription)
+[![Dependabot](https://img.shields.io/badge/dependabot-enabled-025e8c?logo=dependabot)](https://github.com/SONGOAO25/dsh-chatgpt-subscription/security/dependabot)
 
 一个 [DeepSeek Harness](https://github.com/deepseek-ai)（DSH）插件：**用官方 OAuth 一键绑定你的 ChatGPT 账号**，在 DSH 里直接使用 ChatGPT 模型对话，消耗你的 ChatGPT Plus/Pro 订阅额度。
 
-**官方一键授权** —— 在 DSH **设置 → 订阅**页点「**授权登录**」→ 浏览器打开 OpenAI 官方授权页 → 登录并同意 → 绑定完成。无需 API Key、无需命令行、无需改配置文件。
+**官方一键授权** —— 在 DSH **插件 → 已下载的插件 → chatgpt-subscription** 页面点「**授权登录**」→ 浏览器打开 OpenAI 官方授权页 → 登录并同意 → 绑定完成。无需 API Key、无需命令行、无需改配置文件。
 
 ## 功能
 
 - **官方 OAuth 绑定** —— 完整 PKCE + state 流程对接 `auth.openai.com`，与 Codex CLI / OpenCode 同款官方机制；令牌与 OpenAI 直接交换，插件不接触你的密码。
-- **严格官方模式** —— 只有通过本插件设置页完成的授权才算绑定；你已有的 `codex` CLI 登录态不被自动挪用、互不干扰。
+- **严格官方模式** —— 只有通过本插件页面完成的授权才算绑定；你已有的 `codex` CLI 登录态不被自动挪用、互不干扰。
 - **DSH 内使用 ChatGPT 模型** —— 绑定后，模型切换器出现提供商 **ChatGPT** 的模型（如 `gpt-5.6-terra` / `gpt-5.5` / `gpt-5.4`），选择即对话，消耗订阅额度。
 - **令牌看护** —— 令牌临近过期自动续期（JWT 感知，45 分钟提前量）并注入 DSH 凭据；启动即跑一次 + 每 30 分钟维护；失败保留上次正常状态，不崩溃。
-- **绑定状态页** —— **设置 → 订阅**页展示 已绑定/未绑定、令牌有效期与剩余时间，提供「授权登录 / 重新授权 / 解绑」操作。
+- **绑定状态页** —— 插件详情页展示 已绑定/未绑定、令牌有效期与剩余时间，提供「授权登录 / 重新授权 / 解绑」操作。
 - **与 [Bottom Info Bar](https://github.com/songoao25/dsh-bottom-info-bar) 配套** —— 本插件负责绑定与令牌维护；信息栏插件读取令牌显示 ChatGPT 额度（5 小时 / 周 / 月窗口与重置时间）。本插件可单独使用，但信息栏的 ChatGPT 额度显示依赖本插件。
 
 ## 前置条件
@@ -33,7 +33,7 @@
 ### 方式一：一键脚本（推荐）
 
 ```bash
-git clone https://github.com/songoao25/dsh-chatgpt-subscription.git
+git clone https://github.com/SONGOAO25/dsh-chatgpt-subscription.git
 cd dsh-chatgpt-subscription
 ./install.sh                # 默认安装到 web profile；可用 --profile <name> 指定
 ```
@@ -41,7 +41,7 @@ cd dsh-chatgpt-subscription
 ### 方式二：dsh 插件命令
 
 ```bash
-git clone https://github.com/songoao25/dsh-chatgpt-subscription.git
+git clone https://github.com/SONGOAO25/dsh-chatgpt-subscription.git
 cd dsh-chatgpt-subscription
 npm run build               # 由 src/ 构建 lib/
 dsh plugin --profile web add .
@@ -84,14 +84,14 @@ cd dsh-chatgpt-subscription
 不会。一切只发生在本机与 `auth.openai.com` / `chatgpt.com` 之间；令牌不出本机、不进日志。
 
 **问：令牌过期了怎么办？**
-插件会在过期前自动续期；若续期失败（如已被撤销），设置页会给出明确提示，重新授权即可。
+插件会在过期前自动续期；若续期失败（如已被撤销），插件详情页会给出明确提示，重新授权即可。
 
 **问：会影响我的 Codex CLI 登录吗？**
 不会。插件写入同一个标准位置 `~/.codex/auth.json` 并保留其结构；解绑也不删除它。
 
 **问：能看到我的额度吗？**
-安装配套插件 [Bottom Info Bar](https://github.com/songoao25/dsh-bottom-info-bar)——它读取本插件维护的令牌，在底部信息栏显示 ChatGPT 额度（剩余百分比与重置时间）。
+安装配套插件 [Bottom Info Bar](https://github.com/SONGOAO25/dsh-bottom-info-bar)——它读取本插件维护的令牌，在底部信息栏显示 ChatGPT 额度（剩余百分比与重置时间）。
 
 ## 许可证
 
-[MIT](LICENSE) © 2026 songoao25
+[MIT](LICENSE) © 2026 SONGOAO25
