@@ -66,8 +66,11 @@ assert.doesNotMatch(source, /style:\s*\{/, 'no inline style props may remain in 
 // 原生组件接入：宿主 primitives 存在时必须走原生 Button/Switch/Tag/StateDot，缺成员时降级
 assert.match(source, /require\('@deepseek-ai\/dsh-client-ui-primitives'\)/, 'client must try to load the host primitives')
 assert.match(source, /var NativeButton = native\('Button'\)/, 'native Button must be resolved through a safety-checked accessor')
-assert.match(source, /var NativeTag = native\('Tag'\)/, 'native Tag must be resolved through a safety-checked accessor')
-assert.match(source, /var NativeStateDot = native\('StateDot'\)/, 'native StateDot must be resolved through a safety-checked accessor')
+// 状态指示不再用宿主 Tag/StateDot（其几何与 28px 按钮不等高，同屏三个高度）——
+// 改为与按钮同一套几何的自绘状态药丸，这里锁定该约束。
+assert.doesNotMatch(source, /native\('Tag'\)|native\('StateDot'\)/, 'status pill must not use host Tag/StateDot (unequal height against 28px buttons)')
+assert.match(source, /\.cgpt-statusPill \{[^}]*height: 28px; border-radius: 14px; padding: 0 10px; font-size: 12px;/, 'status pill must share the exact button geometry (28px/14px/10px/12px)')
+assert.doesNotMatch(source, /cgptStatusTag|cgptStateDot/, 'legacy tag/dot helpers must be gone')
 assert.doesNotMatch(source, /React\.createElement\(PRIMITIVES\./, 'primitives members must never be passed to createElement unguarded (React #130)')
 // 部署产物必须包含同一份样式（lib 已入库，构建后不得滞后）
 assert.match(artifact, /cgpt-row \{/, 'built client must carry the native row rule')

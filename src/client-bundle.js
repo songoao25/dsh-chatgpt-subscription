@@ -46,8 +46,6 @@ module.exports = {
       return typeof member === 'function' || (member && typeof member === 'object') ? member : null;
     }
     var NativeButton = native('Button');
-    var NativeTag = native('Tag');
-    var NativeStateDot = native('StateDot');
     // h 必须支持多 children（React.createElement 接受可变参数；组件多处传多个子元素）
     function h(tag, props) {
       var args = [tag, props];
@@ -110,6 +108,12 @@ module.exports = {
         .cgpt-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; margin-left: auto; }
         .cgpt-status { display: inline-flex; align-items: center; gap: 6px; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; }
         .cgpt-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--dsw-alias-state-success-primary, #087f5b); }
+        .cgpt-dot--error { background: var(--dsw-alias-state-error-primary, #d92d20); }
+        /* 状态药丸：与 .cgpt-btn 完全同一套几何（28px 高 / 14px 圆角 / 10px 内边距 / 12px 字），
+           只是不可点——保证状态、重新绑定、解绑三个元素同屏等高对齐。 */
+        .cgpt-statusPill { display: inline-flex; align-items: center; gap: 6px; height: 28px; border-radius: 14px; padding: 0 10px; font-size: 12px; font-weight: 400; line-height: 18px; white-space: nowrap; }
+        .cgpt-statusPill--success { color: var(--dsw-alias-state-success-primary, #087f5b); background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #087f5b) 10%, transparent); }
+        .cgpt-statusPill--danger { color: var(--dsw-alias-state-error-primary, #d92d20); background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #d92d20) 10%, transparent); }
         /* 按钮：宿主有原生 Button 时由其接管；这份只是兜底几何（Button.module.css .sm）。 */
         .cgpt-btn { appearance: none; font: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 28px; border: 0.5px solid var(--dsw-alias-border-l3); color: var(--dsw-alias-label-primary); background: transparent; border-radius: 14px; padding: 0 10px; font-size: 12px; font-weight: 400; line-height: 18px; transition: background-color 120ms ease, border-color 120ms ease; }
         .cgpt-btn:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover, rgba(128,128,128,0.08)); }
@@ -160,16 +164,6 @@ module.exports = {
         onClick: props.onClick,
         key: props.key,
       }, props.children);
-    }
-
-    // 状态标记：优先宿主原生 Tag / StateDot
-    function cgptStatusTag(text, tone) {
-      if (NativeTag) return h(NativeTag, { tone: tone, className: 'cgpt-tag' }, text);
-      return h('span', { className: 'cgpt-status' }, h('span', { className: 'cgpt-dot' }), text);
-    }
-    function cgptStateDot(state) {
-      if (NativeStateDot) return h(NativeStateDot, { state: state });
-      return h('span', { className: 'cgpt-dot' });
     }
 
     // ---------- 插件配置页组件 ----------
@@ -299,7 +293,9 @@ module.exports = {
       var statusControls = !bound
         ? [cgptButton({ key: 'auth', onClick: handleAuthorize, disabled: authorizing, children: bindLabel })]
         : [
-          h('span', { className: 'cgpt-status', key: 'state' }, cgptStateDot(needsAttention ? 'error' : 'done'), cgptStatusTag(needsAttention ? '需要注意' : '已连接', needsAttention ? 'danger' : 'success')),
+          h('span', { className: 'cgpt-statusPill ' + (needsAttention ? 'cgpt-statusPill--danger' : 'cgpt-statusPill--success'), key: 'state' },
+            h('span', { className: 'cgpt-dot' + (needsAttention ? ' cgpt-dot--error' : '') }),
+            needsAttention ? '需要注意' : '已连接'),
           cgptButton({ key: 'reauth', className: '', onClick: handleAuthorize, disabled: authorizing, children: authorizing ? '正在打开浏览器…' : '重新绑定' }),
           cgptButton({ key: 'unbind', className: 'cgpt-btn--danger', onClick: handleUnbind, children: '解绑' }),
         ];
