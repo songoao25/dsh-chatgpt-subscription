@@ -69,12 +69,20 @@ module.exports = {
     // 因为本页面就渲染在插件详情页里面：
     //   detailSections { flex-col; gap:32px }  → .cgpt-page
     //   detailSection  { flex-col; gap:12px }  → .cgpt-section
-    //   sectionHead    { baseline; gap:10px }  → .cgpt-sectionHead
+    //   sectionHead    { baseline; gap:10px; padding:0 } → .cgpt-sectionHead
     //   sectionTitle   { 14/500/20 }           → .cgpt-title
     //   sectionCount   { 12/18 二级色 }         → .cgpt-intro / .cgpt-sectionCount
-    //   card/cardHead  { r12; padding 8px }    → .cgpt-row（不是设置弹窗的 .5px 细分隔线）
+    //   rows           { flex-col; gap:0 }     → .cgpt-list
+    //   row            { padding:12px 2px; border-bottom:.5px solid border-l2 } → .cgpt-row
+    //   row:last-child { border-bottom:0 }
+    //   rowLine        { align-items:center; gap:16px } → .cgpt-row 的主轴间距
+    //   rowId          { 13.5/500/20 }         → .cgpt-rowTitle
     //   banner         { 12% 色底; r10; 8px 12px } → .cgpt-alert--warning
     //   failure/reason { 错误色; 12/18; 可换行 }    → .cgpt-alert--error
+    // 【横向对齐铁律】宿主的 .X_2TxG_detailSection（配置区挂载点）实测 x=323.2、padding:0，
+    // 宿主自己的区块标题文字左边界也是 323.2。所以我们的每个内容块都**不能自带左右内边距**，
+    // 否则整体右移、与宿主自己渲染的区块错开——那正是「什么都对不齐」的根因。
+    // 行本身用 padding:12px 2px（宿主 .X_2TxG_row 的真实值），内容内缩 2px，与宿主一致。
     // 全部走 --dsw-alias-* 令牌，深色/浅色主题自动跟随。
     function installStyles() {
       var id = 'dsh-chatgpt-subscription-page';
@@ -83,20 +91,22 @@ module.exports = {
       style.dataset.plugin = 'dsh-chatgpt-subscription';
       style.dataset.pluginCss = id;
       style.textContent = `
-        .cgpt-page { display: flex; flex-direction: column; width: 100%; max-width: 760px; min-width: 0; gap: 32px; color: var(--dsw-alias-label-primary); }
+        /* 宽度上限交给宿主：.X_2TxG_page > * 已把内容钉在 min(100%, 960px)，这里再写死 760px 会在宽视口下压窄内容、右侧控件够不到宿主右边界。 */
+        .cgpt-page { display: flex; flex-direction: column; width: 100%; max-width: 100%; min-width: 0; gap: 32px; color: var(--dsw-alias-label-primary); }
         .cgpt-page, .cgpt-page * { box-sizing: border-box; }
         .cgpt-section { display: flex; flex-direction: column; gap: 12px; width: 100%; min-width: 0; }
-        .cgpt-sectionHead { display: flex; align-items: baseline; gap: 10px; width: 100%; min-width: 0; padding: 0 8px; }
+        .cgpt-sectionHead { display: flex; align-items: baseline; gap: 10px; width: 100%; min-width: 0; padding: 0; }
         .cgpt-title { margin: 0; min-width: 0; font-size: 14px; font-weight: 500; line-height: 20px; color: var(--dsw-alias-label-primary); }
-        .cgpt-sectionCount { color: var(--dsw-alias-label-caption, var(--dsw-alias-label-tertiary)); font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; }
-        .cgpt-intro { width: 100%; margin: 0; padding: 0 8px; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; }
-        /* 行 = 原生详情页卡行；不用分隔线，靠 r12 + 8px 内边距与 hover 填充区分。
-           注意不能照抄原生的 margin: 0 -8px（负外边距），那会让行比容器宽 16px 而被裁掉。 */
-        .cgpt-list { display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 0; }
-        .cgpt-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-width: 0; padding: 8px; border: 0; border-radius: 12px; }
+        .cgpt-sectionCount { color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; }
+        .cgpt-intro { width: 100%; margin: 0; padding: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 20px; }
+        /* 行 = 原生详情页的 .X_2TxG_row：12px 2px 内边距 + .5px 下边线（末行无线），
+           无圆角、无 hover 填充、无负外边距。分隔靠边线，所以列表 gap 为 0。 */
+        .cgpt-list { display: flex; flex-direction: column; gap: 0; width: 100%; min-width: 0; }
+        .cgpt-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-width: 0; margin: 0; padding: 12px 2px; border: 0; border-bottom: 0.5px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.16)); border-radius: 0; }
+        .cgpt-row:last-child { border-bottom: 0; }
         .cgpt-rowText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-        .cgpt-rowTitle { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 400; line-height: 20px; color: var(--dsw-alias-label-primary); }
-        .cgpt-rowDesc { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); overflow-wrap: anywhere; }
+        .cgpt-rowTitle { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 500; line-height: 20px; color: var(--dsw-alias-label-primary); }
+        .cgpt-rowDesc { font-size: 11.5px; line-height: 16px; color: var(--dsw-alias-label-tertiary); overflow-wrap: anywhere; }
         .cgpt-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; margin-left: auto; }
         .cgpt-status { display: inline-flex; align-items: center; gap: 6px; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; }
         .cgpt-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--dsw-alias-state-success-primary, #087f5b); }
@@ -111,11 +121,12 @@ module.exports = {
         .cgpt-btn--danger { color: var(--dsw-alias-state-error-primary, #d92d20); border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #d92d20) 30%, transparent); }
         .cgpt-btn--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #d92d20) 8%, transparent); }
         /* 提示块：三种原生形态 */
-        .cgpt-alerts { display: flex; flex-direction: column; gap: 12px; width: 100%; min-width: 0; padding: 0 8px; }
+        .cgpt-alerts { display: flex; flex-direction: column; gap: 12px; width: 100%; min-width: 0; padding: 0; }
         .cgpt-alert { width: 100%; min-width: 0; margin: 0; font-size: 12px; line-height: 18px; }
-        .cgpt-alert--error { color: var(--dsw-alias-state-error-primary, #d92d20); overflow-wrap: anywhere; white-space: pre-wrap; }
+        /* 错误：照原生 .X_2TxG_failure（行内 flex + 错误色 + gap 10）+ .X_2TxG_reason（12/18 可换行）。 */
+        .cgpt-alert--error { display: flex; align-items: center; gap: 10px; color: var(--dsw-alias-state-error-primary, #d92d20); overflow-wrap: anywhere; white-space: pre-wrap; }
         .cgpt-alert--warning { background: color-mix(in srgb, var(--dsw-alias-state-warning-primary, #f59e0b) 12%, transparent); color: var(--dsw-alias-label-primary); border-radius: 10px; padding: 8px 12px; }
-        .cgpt-note { width: 100%; margin: 0; padding: 0 8px; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+        .cgpt-note { width: 100%; margin: 0; padding: 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
         .cgpt-loading { margin: 0; padding: 0 8px; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; }
         @media (max-width: 600px) { .cgpt-page { gap: 24px; } .cgpt-row { align-items: flex-start; } .cgpt-controls { justify-content: flex-start; margin-left: 0; } }
         @media (prefers-reduced-motion: reduce) { .cgpt-btn { transition: none; } }
