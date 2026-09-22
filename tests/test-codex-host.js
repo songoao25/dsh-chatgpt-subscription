@@ -90,6 +90,7 @@ const fnNames = [
   'readCodexAuthFile', 'writeAuthJson', 'readBindFlag', 'writeBindFlag', 'clearBindFlag',
   'createPkcePair', 'buildAuthorizeUrl', 'parseCallbackUrl', 'oauthCallbackPort',
   'codexAccountIdFromJwt', 'buildOAuthAuthObject', 'routingModeFor',
+  'readSettingsSection', 'settingsServiceReady',
 ]
 const mod = extractModule(fnNames)
 const {
@@ -97,6 +98,7 @@ const {
   readCodexAuthFile, writeAuthJson, readBindFlag, writeBindFlag, clearBindFlag,
   createPkcePair, buildAuthorizeUrl, parseCallbackUrl, oauthCallbackPort,
   codexAccountIdFromJwt, buildOAuthAuthObject, routingModeFor,
+  readSettingsSection, settingsServiceReady,
 } = mod
 
 // 环境变量隔离（测试前设置）
@@ -138,6 +140,32 @@ function makeJwt(claims) {
   check('健康绑定 + DeepSeek → DeepSeek 模式', routingModeFor(true, true, 'deepseek-official'), 'deepseek')
   check('令牌失效 + ChatGPT 选择 → DeepSeek 模式', routingModeFor(true, false, 'openai-codex'), 'deepseek')
   check('未绑定 + ChatGPT 选择 → DeepSeek 模式', routingModeFor(false, true, 'openai-codex'), 'deepseek')
+}
+
+// ---- 测试 2c：settings 服务跨版本读取（0.1.7 移除 get(ns)，只剩 describe()） ----
+// 回归背景：旧代码只认 settings.get，新宿主上没有这个函数 → ensureCodexRoute 直接
+// 早退成「settings 服务未就绪，下个周期重试」，绑定 ChatGPT 后路由永远注册不上。
+{
+  const section = { providers: { 'openai-codex': { apiKeyEnv: 'OPENAI_CODEX_API_KEY' } } }
+  // 新宿主：describe() 返回描述数组，按 ns 定位
+  const newHost = { describe: () => [{ ns: 'llm-deepseek', value: {} }, { ns: 'llm-pi-ai', value: section }], mutate: () => {} }
+  check('新宿主 describe() 能读到 llm-pi-ai', readSettingsSection(newHost, 'llm-pi-ai'), section)
+  check('新宿主 describe() 缺该节 → undefined', readSettingsSection(newHost, 'ui-theme'), undefined)
+  check('新宿主 readiness = true', settingsServiceReady(newHost), true)
+  // 旧宿主：只有 get(ns)
+  const oldHost = { get: (ns) => (ns === 'llm-pi-ai' ? section : undefined), mutate: () => {} }
+  check('旧宿主 get(ns) 兜底可用', readSettingsSection(oldHost, 'llm-pi-ai'), section)
+  check('旧宿主 readiness = true', settingsServiceReady(oldHost), true)
+  // describe() 抛错时回落 get(ns)，不崩
+  const brokenDescribe = { describe: () => { throw new Error('boom') }, get: () => section, mutate: () => {} }
+  check('describe() 抛错 → 回落 get(ns)', readSettingsSection(brokenDescribe, 'llm-pi-ai'), section)
+  // describe() 回畸形值时不崩
+  check('describe() 回非数组 → undefined（无 get 时）', readSettingsSection({ describe: () => 'nope' }, 'llm-pi-ai'), undefined)
+  check('get(ns) 抛错 → undefined', readSettingsSection({ get: () => { throw new Error('boom') } }, 'llm-pi-ai'), undefined)
+  // readiness 闸门：能读但不会写 / 什么都不会，都判为未就绪
+  check('只有读能力、无 mutate → 未就绪（防止写不进去还宣称成功）', settingsServiceReady({ describe: () => [] }), false)
+  check('空对象 → 未就绪', settingsServiceReady({}), false)
+  check('null / undefined → 未就绪', [settingsServiceReady(null), settingsServiceReady(undefined)], [false, false])
 }
 
 // ---- 测试 3：绑定标记 ----
@@ -241,6 +269,10 @@ function makeJwt(claims) {
   check('客户端 RPC 检查 HTTP 状态', clientSrc.includes("if (!r.ok) throw new Error"), true)
   check('客户端卸载清理授权轮询', clientSrc.includes('pollRef.current'), true)
   check('未绑定启动不主动注册 ChatGPT 路由', !src.includes('    ensureCodexRoute();\n    syncCodexToken();'), true)
+  check('host 读 llm-pi-ai 一律经 readSettingsSection（0.1.7 起 settings.get 已被移除）',
+    src.includes("readSettingsSection(settings, 'llm-pi-ai')") && !src.includes("settings.get('llm-pi-ai')"), true)
+  check('host 的 settings 就绪判定兼容两代宿主（describe 或 get）',
+    src.includes('function settingsServiceReady(settings)') && src.includes('return typeof settings.describe'), true)
 }
 
 // 清理临时文件

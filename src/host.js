@@ -22,6 +22,37 @@ function routingModeFor(bound, bridgeHealthy, provider) {
   return bound === true && bridgeHealthy === true && provider === 'openai-codex' ? 'chatgpt' : 'deepseek'
 }
 
+// DSH 0.1.7 起 settings 服务换成 SettingsForms：get(ns) 被整块移除，只剩
+// describe() / update() / replace() / mutate()，描述项形如
+//   [{ ns: 'llm-pi-ai', value: { providers: { … } }, revision: 3, … }]
+// （value 是 schema 默认 → 组合基线 → 用户层解析后的当前值，且敏感字段已脱敏）。
+// 读某一节统一走这里：新宿主优先 describe()，旧宿主退回 get(ns)，都读不到返回 undefined。
+// 写回一律用 mutate()——新旧宿主都支持，不需要分支。
+// 纯函数，便于回归测试（tests/test-codex-host.js 按名提取后整体求值）。
+function readSettingsSection(settings, ns) {
+  if (!settings || typeof settings !== 'object') return undefined
+  if (typeof settings.describe === 'function') {
+    try {
+      const described = settings.describe()
+      if (Array.isArray(described)) {
+        for (const entry of described) {
+          if (entry && entry.ns === ns) return entry.value
+        }
+      }
+    } catch (err) { /* describe 不可用时落到旧宿主路径 */ }
+  }
+  if (typeof settings.get === 'function') {
+    try { return settings.get(ns) } catch (err) { return undefined }
+  }
+  return undefined
+}
+
+// 宿主是否具备「能读 + 能写」的 settings 能力：0.1.6 要 get+mutate，0.1.7 要 describe+mutate。
+function settingsServiceReady(settings) {
+  if (!settings || typeof settings.mutate !== 'function') return false
+  return typeof settings.describe === 'function' || typeof settings.get === 'function'
+}
+
 const CODEX_JWT_ACCOUNT_CLAIM = 'https://api.openai.com/auth' // access_token JWT payload 里账号声明的命名空间键（wham 账号提取用）
 const OAUTH_SCOPE = 'openid profile email offline_access' // 官方授权 scope（与 pi-ai/Codex CLI 一致；offline_access 换 refresh_token）
 
@@ -407,11 +438,11 @@ export default {
     // ---------- 路由注册（仅绑定时启用；用户同名路由绝不覆盖） ----------
     async function ensureCodexRoute(flag) {
       const settings = ctx.settings || ctx.get('settings');
-      if (!settings || typeof settings.get !== 'function' || typeof settings.mutate !== 'function') {
+      if (!settingsServiceReady(settings)) {
         return { ok: false, owned: false, message: 'settings 服务未就绪，下个周期重试' };
       }
       try {
-        const cur = settings.get('llm-pi-ai');
+        const cur = readSettingsSection(settings, 'llm-pi-ai');
         const providers = cur && typeof cur === 'object' && cur.providers && typeof cur.providers === 'object' ? cur.providers : {};
         const existing = providers['openai-codex'];
         if (existing && existing.apiKeyEnv !== 'OPENAI_CODEX_API_KEY') {
@@ -437,8 +468,8 @@ export default {
     async function removeOwnedCodexRoute(flag) {
       if (!flag.routeOwned && !codexRouteOwned) return;
       const settings = ctx.settings || ctx.get('settings');
-      if (!settings || typeof settings.get !== 'function' || typeof settings.mutate !== 'function') return;
-      const cur = settings.get('llm-pi-ai');
+      if (!settingsServiceReady(settings)) return;
+      const cur = readSettingsSection(settings, 'llm-pi-ai');
       const route = cur && cur.providers && cur.providers['openai-codex'];
       if (route && route.apiKeyEnv === 'OPENAI_CODEX_API_KEY') {
         await settings.mutate('llm-pi-ai', [{ op: 'unset', path: ['providers', 'openai-codex'] }]);
