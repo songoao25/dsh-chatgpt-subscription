@@ -2,6 +2,14 @@
 
 本项目的版本记录遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.2](https://github.com/songoao25/dsh-chatgpt-subscription/compare/v0.2.1...v0.2.2) (2026-09-22)
+
+
+### Bug Fixes
+
+* move subscription controls to plugin details ([#12](https://github.com/songoao25/dsh-chatgpt-subscription/issues/12)) ([48ae6c0](https://github.com/songoao25/dsh-chatgpt-subscription/commit/48ae6c023f4a3f8bd666ac3eaafa5c95ff2dce7f))
+* 适配 DSH 0.1.7 移除的 settings.get(ns)（并补回缺失的 try） ([#13](https://github.com/songoao25/dsh-chatgpt-subscription/issues/13)) ([c6c4d21](https://github.com/songoao25/dsh-chatgpt-subscription/commit/c6c4d21540b7c8f5afee9bccfd816d93845aecb1))
+
 ## [Unreleased]
 
 ### Fixed
