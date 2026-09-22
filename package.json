@@ -1,6 +1,6 @@
 {
   "name": "dsh-chatgpt-subscription",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "把你的 ChatGPT 账号绑进 DSH：登录一次，就能在 DSH 里直接用 ChatGPT 模型聊天，底部信息栏会显示剩余额度。",
   "keywords": [
     "deepseek-harness",
