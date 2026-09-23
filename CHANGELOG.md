@@ -29,6 +29,7 @@
 ### Fixed
 
 - **配置页整块消失（回归，已修复）**：client half 没在 `inject` 里声明 `locale` 就访问 `ctx.locale`，cordis 直接抛 `cannot get property "locale" without inject`，配置区块渲染失败——插件名与描述来自 locale 文件，所以看起来「只剩标题」；现已声明 `inject: ['slots', 'locale']` 并把取值整段包进 try/catch
+- **Components 里同一串字占了两行（已修）**：挂载行的 `id` 与 `name` 都写成了包名，而 DSH 的插件卡片把「行 id」与「模块名」分别渲染成一行（只有与标题相同才省略），两个相同字符串就成了重复的两行。行 id 改为 `chatgpt-subscription`（用户覆盖用的短键），`name` 保持包名——官方 bundle（`agent-team` + 完整包名）与 `dsh-opencode-session` 都是这个写法
 
 ### Changed
 
