@@ -1,4 +1,4 @@
-# ChatGPT 订阅插件
+# ChatGPT 订阅
 
 [**English**](README.md) | **中文**
 
@@ -11,7 +11,7 @@
 
 一个 [DeepSeek Harness](https://github.com/deepseek-ai)（DSH）插件：用 OpenAI 官方 OAuth 登录 ChatGPT 账号，之后在 DSH 里使用 ChatGPT 模型，消耗你的 ChatGPT Plus/Pro 订阅额度。
 
-**官方登录** —— 在 DSH **插件** 页进入 **chatgpt-subscription**，点「**绑定 ChatGPT 账号**」，在浏览器里同意授权即完成绑定。不需要 API Key，也不用改配置文件。
+**官方登录** —— 在 DSH **插件** 页进入 **ChatGPT 订阅**，点「**绑定 ChatGPT 账号**」，在浏览器里同意授权即完成绑定。不需要 API Key，也不用改配置文件。
 
 ## 功能
 
@@ -51,11 +51,10 @@ dsh plugin --profile web add .
 
 ## 使用方法
 
-1. 重启 `dsh web`，打开左侧 **设置**（⚙️）。
-2. 点击 **订阅**（紧挨「模型」下方）。
-3. 点击「**绑定 ChatGPT 账号**」——浏览器打开 OpenAI 官方登录页。
-4. 用 ChatGPT 账号登录并同意授权；页面显示「**已绑定**」即完成。
-5. 新建对话，在模型切换器选择提供商 **ChatGPT** 的模型（如 `gpt-5.6-terra`）对话，额度计入订阅。
+1. 重启 `dsh web`，打开左侧 **插件** 页，点进 **ChatGPT 订阅**。
+2. 点「**绑定 ChatGPT 账号**」——浏览器打开 OpenAI 官方登录页。
+3. 用 ChatGPT 账号登录并同意授权；页面显示「**已连接**」即完成。
+4. 新建对话，在模型切换器选择提供商 **ChatGPT** 的模型（如 `gpt-5.6-terra`）对话，额度计入订阅。
 
 > 若浏览器没有自动打开，页面会以 `window.open` 兜底；请允许 DSH 的弹窗。
 

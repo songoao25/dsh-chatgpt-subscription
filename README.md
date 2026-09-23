@@ -1,4 +1,4 @@
-# dsh-chatgpt-subscription
+# ChatGPT Subscription
 
 **English** | [**中文**](README.zh-CN.md)
 
@@ -11,7 +11,7 @@
 
 A [DeepSeek Harness](https://github.com/deepseek-ai) plugin: sign in with your ChatGPT account through OpenAI's official OAuth flow, then use ChatGPT models inside DSH. Model calls use your ChatGPT Plus / Pro subscription quota.
 
-**Official sign-in** — Open **Plugins**, then **chatgpt-subscription**, and click **Sign in with ChatGPT**. Approve in the browser and the account is bound. No API keys, no config files.
+**Official sign-in** — Open **Plugins**, then **ChatGPT Subscription**, and click **Sign in with ChatGPT**. Approve in the browser and the account is bound. No API keys, no config files.
 
 ## Features
 
@@ -51,11 +51,10 @@ dsh plugin --profile web add .
 
 ## Usage
 
-1. Restart `dsh web`, then open **Plugins → Installed → chatgpt-subscription**.
-2. Click **订阅** (right below **模型**).
-3. Click **Sign in with ChatGPT** — your browser opens the official OpenAI sign-in page.
-4. Sign in with your ChatGPT account and approve. The page shows **已绑定** when done.
-5. Open a new conversation, switch the model to a ChatGPT model (provider **ChatGPT**, e.g. `gpt-5.6-terra`) and chat — usage counts against your subscription.
+1. Restart `dsh web`, then open **Plugins** and click **ChatGPT Subscription**.
+2. Click **Sign in with ChatGPT** — your browser opens the official OpenAI sign-in page.
+3. Sign in with your ChatGPT account and approve. The page shows **Connected** when done.
+4. Open a new conversation, switch the model to a ChatGPT model (provider **ChatGPT**, e.g. `gpt-5.6-terra`) and chat — usage counts against your subscription.
 
 > If the browser tab doesn't open automatically, the page also calls `window.open` as a fallback; allow pop-ups for DSH if prompted.
 
