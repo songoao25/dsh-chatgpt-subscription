@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "ChatGPT Subscription",
-    "description": "Bind your ChatGPT account through OpenAI's official OAuth flow, then use ChatGPT models in DSH with your subscription quota."
+    "description": "Sign in with your ChatGPT account to use ChatGPT models in DSH."
   }
 }

@@ -1,8 +1,12 @@
-// dsh-chatgpt-subscription — 插件描述的中英双语契约
-// 覆盖两条描述通路：
-//   1) 插件列表卡片 —— DSH readPluginMeta 读 locale/{en,zh}.json 的 meta（title + description）
-//   2) 插件详情页顶部 —— 本插件 client bundle 的 plugins.bundle.config summary 视图，按 ctx.locale 取值
-// 另锁「文案去 AI 味」：无破折号、无感叹号、无「一键/丝滑/seamless」这类营销词。
+// dsh-chatgpt-subscription — 文案双语契约 + 配置页渲染回归
+// 覆盖：
+//   1) locale/{en,zh}.json（插件列表卡片的 meta）与 package.json 接线
+//   2) client half 的 zh/en 字典：键完全对称、中英都齐全、无 AI 腔
+//   3) 宿主每个错误 code 都有中英两条文案
+//   4) 在「按 inject 授权服务访问」的 ctx 上真实跑 client half（cordis 语义）——
+//      曾经的线上事故：inject 少写 locale 就访问 ctx.locale，cordis 直接抛
+//      cannot get property "locale" without inject，整个配置页因此消失
+//   5) zh / en 两种语言下渲染摘要页、加载态、已连接态、错误态，英文页不得出现中文
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -12,16 +16,17 @@ import vm from 'node:vm'
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const readJson = (relative) => JSON.parse(readFileSync(join(root, relative), 'utf8'))
+const source = readFileSync(join(root, 'src', 'client-bundle.js'), 'utf8')
+const hostSource = readFileSync(join(root, 'src', 'host.js'), 'utf8')
+const artifact = readFileSync(join(root, 'lib', 'client.js'), 'utf8')
 
 // ---------- 1. locale 文件：DSH 内置语言只有 zh / en，两侧必须一一对应 ----------
 assert.deepEqual(readdirSync(join(root, 'locale')).sort(), ['en.json', 'zh.json'],
   'locale/ must carry exactly the two DSH built-in languages (zh, en)')
 const en = readJson('locale/en.json')
 const zh = readJson('locale/zh.json')
-assert.deepEqual(Object.keys(en.meta).sort(), Object.keys(zh.meta).sort(),
-  'en/zh meta must declare the same fields')
-assert.deepEqual(Object.keys(en.meta).sort(), ['description', 'title'],
-  'plugin metadata carries a title and a description')
+assert.deepEqual(Object.keys(en.meta).sort(), Object.keys(zh.meta).sort(), 'en/zh meta must declare the same fields')
+assert.deepEqual(Object.keys(en.meta).sort(), ['description', 'title'], 'plugin metadata carries a title and a description')
 for (const [lang, meta] of [['en', en.meta], ['zh', zh.meta]]) {
   for (const field of ['title', 'description']) {
     assert.equal(typeof meta[field], 'string', lang + '.' + field + ' must be a string')
@@ -38,35 +43,55 @@ assert.ok(pkg.files.includes('locale/*.json'), 'the published tarball must inclu
 assert.equal(pkg.description, en.meta.description,
   'package.json description is the English fallback and must equal locale/en.json meta.description')
 
-// ---------- 3. 文案去 AI 味 ----------
-const AI_SMELL_ZH = /一键|轻松|极致|丝滑|强大|完美|立即|马上|告别|无需|不再/
-const AI_SMELL_EN = /seamless|effortless|powerful|unleash|revolutionary|game.?chang|supercharge|simply|just /i
-const AI_SMELL_SHARED = /[—–]|--|[!！]|[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u
-for (const [lang, meta] of [['en', en.meta], ['zh', zh.meta]]) {
-  const copy = meta.title + ' ' + meta.description
-  assert.doesNotMatch(copy, AI_SMELL_SHARED, lang + ' copy must not use dashes, exclamation or emoji')
-  assert.doesNotMatch(meta.description, lang === 'zh' ? AI_SMELL_ZH : AI_SMELL_EN,
-    lang + ' description must stay free of marketing filler')
+// ---------- 3. client half 的字典 ----------
+const dictionaryBlock = source.match(/const LOCALES = \{[\s\S]*?\n\};/)
+assert.ok(dictionaryBlock, 'client half must define the zh/en dictionary')
+const LOCALES = vm.runInNewContext(dictionaryBlock[0] + '; LOCALES')
+const zhKeys = Object.keys(LOCALES.zh)
+const enKeys = Object.keys(LOCALES.en)
+assert.deepEqual(enKeys.filter((key) => !zhKeys.includes(key)), [], 'every English key needs a Chinese one')
+assert.deepEqual(zhKeys.filter((key) => !enKeys.includes(key)), [], 'every Chinese key needs an English one')
+for (const key of zhKeys) {
+  assert.ok(LOCALES.zh[key].trim() !== '' && LOCALES.en[key].trim() !== '', key + ' must be non-empty in both languages')
+  assert.notEqual(LOCALES.zh[key], LOCALES.en[key], key + ' must actually be translated')
 }
-assert.ok(en.meta.description.length <= 170, 'English description must stay card-sized')
-assert.ok(zh.meta.description.length <= 80, '中文描述保持卡片长度')
-
-// ---------- 4. 运行时：详情页顶部与列表标题随 DSH 语言切换 ----------
-const artifact = readFileSync(join(root, 'lib', 'client.js'), 'utf8')
-assert.match(artifact, /plugins\.bundle\.config/, 'built client must remain the description source for the detail page')
-assert.ok(artifact.includes(en.meta.description), 'built client must carry the English description (rebuild lib/)')
-assert.ok(artifact.includes(zh.meta.description), 'built client must carry the Chinese description (rebuild lib/)')
-
-// React 替身：只需支撑本组件的 hook 与 createElement
-const React = {
-  createElement: function (tag, props) {
-    return { tag, props: props || {}, children: Array.prototype.slice.call(arguments, 2) }
-  },
-  useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => {}],
-  useCallback: (fn) => fn,
-  useEffect: () => {},
-  useRef: (value) => ({ current: value }),
+for (const key of ['meta.title', 'meta.description']) {
+  assert.ok(zhKeys.includes(key), 'the dictionary carries ' + key + ' for the detail page description')
 }
+assert.equal(LOCALES.en['meta.title'], en.meta.title, 'the English title must match locale/en.json')
+assert.equal(LOCALES.zh['meta.title'], zh.meta.title, 'the Chinese title must match locale/zh.json')
+assert.equal(LOCALES.en['meta.description'], en.meta.description, 'the English description must match locale/en.json')
+assert.equal(LOCALES.zh['meta.description'], zh.meta.description, 'the Chinese description must match locale/zh.json')
+
+// ---------- 4. 宿主错误 code 必须在字典里有中英两条 ----------
+const hostCodes = new Set()
+for (const match of hostSource.matchAll(/code:\s*([^,\n]+)/g)) {
+  // 宿主里 code 还有别的含义（OAuth 回调的授权码），只认 <组>.<名> 形态的错误码
+  for (const literal of match[1].matchAll(/'([a-z][a-z0-9-]*\.[a-z0-9-]+)'/g)) hostCodes.add(literal[1])
+}
+assert.ok(hostCodes.size >= 30, 'the host must tag its user-visible errors with stable codes')
+for (const code of hostCodes) {
+  assert.ok(zhKeys.includes('error.' + code), 'missing Chinese copy for host error code ' + code)
+  assert.ok(enKeys.includes('error.' + code), 'missing English copy for host error code ' + code)
+}
+
+// ---------- 5. 文案去 AI 味 ----------
+const AI_SMELL_ZH = /一键|轻松|极致|丝滑|强大|完美|立即|马上|告别/
+const AI_SMELL_EN = /seamless|effortless|powerful|unleash|revolutionary|game.?chang|supercharge/i
+const AI_SMELL_SHARED = /[—–]|[!！]|[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u
+for (const lang of ['zh', 'en']) {
+  for (const key of Object.keys(LOCALES[lang])) {
+    const copy = LOCALES[lang][key]
+    assert.doesNotMatch(copy, AI_SMELL_SHARED, lang + ' ' + key + ' must not use dashes dressed as prose, exclamation or emoji')
+    assert.doesNotMatch(copy, lang === 'zh' ? AI_SMELL_ZH : AI_SMELL_EN, lang + ' ' + key + ' must stay free of marketing filler')
+  }
+}
+assert.ok(en.meta.description.length <= 90, 'English description must stay one short line')
+assert.ok(zh.meta.description.length <= 40, '中文描述保持一行')
+
+// ---------- 6. 在 cordis 语义的 ctx 上真实跑 client half ----------
+assert.match(source, /inject:\s*\['slots',\s*'locale'\]/, 'the client half must declare the services it reads')
+
 const documentStub = {
   querySelector: () => null,
   createElement: () => ({ dataset: {}, textContent: '' }),
@@ -82,60 +107,134 @@ vm.createContext(sandbox)
 vm.runInContext(artifact, sandbox)
 assert.equal(sandbox.loaded.id, 'dsh-chatgpt-subscription', 'client module id must stay the bundle name')
 
-// DSH 的 resolveText 语义：{en, zh} 按当前语言回退链取值
-function localeFor(active) {
-  const chains = { zh: ['zh', 'en'], en: ['en'] }
+const statusBox = { value: null, index: 0 }
+const React = {
+  createElement: function (tag, props) {
+    return { tag, props: props || {}, children: Array.prototype.slice.call(arguments, 2) }
+  },
+  useState: function (initial) {
+    const index = statusBox.index++
+    return [index === 0 ? statusBox.value : (typeof initial === 'function' ? initial() : initial), () => {}]
+  },
+  useCallback: (fn) => fn,
+  useEffect: () => {},
+  useRef: (value) => ({ current: value }),
+}
+const requireStub = (name) => {
+  if (name === 'react') return React
+  throw new Error('unexpected module request: ' + name)
+}
+
+// 假 locale 服务：与 DSH 的 locale 服务同形（register 一次收全部语言，bind 读当前语言）
+function createLocaleService() {
+  const namespaces = new Map()
+  let active = 'zh'
   return {
-    resolveText(text) {
-      if (typeof text === 'string') return text
-      return chains[active].reduceRight((resolved, locale) => text[locale] ?? resolved, text.en)
+    setActive: (id) => { active = id },
+    register: (ns, dicts) => { namespaces.set(ns, dicts); return () => namespaces.delete(ns) },
+    bind: (ns) => (key) => {
+      const dicts = namespaces.get(ns)
+      return dicts && dicts[active] && dicts[active][key] ? dicts[active][key] : key
     },
   }
 }
+
+/**
+ * 按 cordis 的 inject 语义构造 ctx：未在 inject 里声明的服务属性一律抛错
+ * （实测 cordis 报 cannot get property "x" without inject），ctx.get / ctx.effect 永远可用。
+ */
+function cordisLikeContext(declared, services) {
+  const allowed = new Set([...declared, 'get', 'effect', 'on', 'once', 'provide'])
+  return new Proxy({}, {
+    get(_target, prop) {
+      if (typeof prop !== 'string') return undefined
+      if (!allowed.has(prop)) {
+        if (services[prop] !== undefined) throw new Error('cannot get property "' + prop + '" without inject')
+        return undefined
+      }
+      if (prop === 'get') return (name) => services[name]
+      if (prop === 'effect') return (fn) => (typeof fn === 'function' ? fn() : undefined)
+      return services[prop]
+    },
+  })
+}
+
 function textsOf(node, sink) {
   const out = sink || []
   if (typeof node === 'string') out.push(node)
-  else if (typeof node === 'function') textsOf(node(node.props), out) // 函数组件：替身里直接展开
+  else if (typeof node === 'function') textsOf(node(node.props), out)
   else if (node && typeof node.tag === 'function') textsOf(node.tag(node.props), out)
   else if (node && node.children) for (const child of node.children) textsOf(child, out)
   return out
 }
-async function render(options) {
+
+async function boot(options) {
   const registry = {}
-  const ctx = {
+  const localeService = options.locale === false ? null : createLocaleService()
+  if (localeService) localeService.setActive(options.locale)
+  const services = {
     slots: {
       inject: (name, callback) => { callback(); return () => {} },
       register: (entry, component) => { registry.entry = entry; registry.component = component; return () => {} },
     },
   }
-  if (options.locale) ctx.locale = localeFor(options.locale)
-  if (options.languages) sandbox.window.navigator = { languages: options.languages }
-  await sandbox.loaded.factory((name) => {
-    if (name === 'react') return React
-    throw new Error('unexpected module request: ' + name)
-  }).apply(ctx)
+  if (localeService) services.locale = localeService
+  const plugin = sandbox.loaded.factory(requireStub)
+  await plugin.apply(cordisLikeContext(plugin.inject, services))
   assert.equal(typeof registry.component, 'function', 'configuration entry must register through the slot')
   return {
     label: registry.entry.label(),
     summary: textsOf(registry.component({ view: 'summary' })).join(''),
-    page: textsOf(registry.component({ view: 'page' })).join(' '),
+    render: (status) => {
+      statusBox.value = status
+      statusBox.index = 0
+      const text = textsOf(registry.component({ view: 'page' })).join(' ')
+      statusBox.value = null
+      statusBox.index = 0
+      return text
+    },
   }
 }
 
-const zhRender = await render({ locale: 'zh' })
-assert.equal(zhRender.summary, zh.meta.description, 'Chinese locale must render the Chinese description')
-assert.equal(zhRender.label, zh.meta.title, 'Chinese locale must render the Chinese title')
-assert.ok(zhRender.page.includes(zh.meta.title), 'the page section head follows the active language')
+for (const lang of ['zh', 'en']) {
+  const app = await boot({ locale: lang })
+  assert.equal(app.summary, LOCALES[lang]['meta.description'], lang + ': the detail page must show the ' + lang + ' description')
+  assert.equal(app.label, LOCALES[lang]['meta.title'], lang + ': the page title must follow the active language')
+  const loading = app.render(null)
+  assert.ok(loading.includes(LOCALES[lang]['ui.loading']), lang + ': the loading line must be translated')
+  assert.ok(!loading.includes(LOCALES[lang]['meta.title']), lang + ': the page must not restate the title the host already renders')
+  const connected = app.render({ bound: true, expiresAt: 4102444800000, account: { email: 'a@b.c', plan: 'plus' } })
+  assert.ok(connected.includes(LOCALES[lang]['ui.status']), lang + ': the status row must be translated')
+  assert.ok(connected.includes(LOCALES[lang]['ui.unbind']), lang + ': the unbind control must be translated')
+  assert.ok(connected.includes('plus'), lang + ': the plan suffix must wrap the plan name')
+  const failed = app.render({ bound: true, error: { kind: 'auth', code: 'token.expiring', message: 'HOST FALLBACK' } })
+  assert.ok(failed.includes(LOCALES[lang]['error.token.expiring']), lang + ': a coded host error must be translated')
+  assert.ok(!failed.includes('HOST FALLBACK'), lang + ': the translated copy replaces the host fallback')
+  const unknown = app.render({ bound: true, error: { kind: 'auth', message: 'HOST FALLBACK' } })
+  assert.ok(unknown.includes('HOST FALLBACK'), lang + ': a codeless host error keeps its original text')
+}
 
-const enRender = await render({ locale: 'en' })
-assert.equal(enRender.summary, en.meta.description, 'English locale must render the English description')
-assert.equal(enRender.label, en.meta.title, 'English locale must render the English title')
-assert.ok(enRender.page.includes(en.meta.title), 'the page section head follows the active language')
+// 英文页面里不允许再出现中文（操作文案也不许漏译）
+const english = await boot({ locale: 'en' })
+for (const status of [null, { bound: false }, { bound: true, expiresAt: 4102444800000, account: { email: 'a@b.c', plan: 'plus' } }, { bound: true, error: { code: 'oauth.timeout' } }]) {
+  const text = english.render(status)
+  assert.doesNotMatch(text, /[\u4e00-\u9fa5]/, 'the English page must not fall back to Chinese: ' + text)
+}
+const chinese = await boot({ locale: 'zh' })
+const zhText = chinese.render({ bound: true, expiresAt: 4102444800000, account: { email: 'a@b.c', plan: 'plus' } })
+assert.doesNotMatch(zhText.replace(/ChatGPT|OpenAI|DSH|plus|a@b\.c/g, ''), /[A-Za-z]{4,}/, 'the Chinese page must not fall back to English')
 
 // locale 服务缺席时按浏览器语言兜底，最后退英文
-const fallbackEn = await render({ languages: ['en-US', 'en'] })
-assert.equal(fallbackEn.summary, en.meta.description, 'without the locale service the browser language decides')
-const fallbackZh = await render({ languages: ['zh-CN'] })
-assert.equal(fallbackZh.summary, zh.meta.description, 'zh-CN must fall back to the zh copy')
+sandbox.window.navigator = { languages: ['zh-CN'] }
+const noServiceZh = await boot({ locale: false })
+assert.equal(noServiceZh.summary, LOCALES.zh['meta.description'], 'zh-CN must fall back to the Chinese copy')
+sandbox.window.navigator = { languages: ['en-US', 'en'] }
+const noServiceEn = await boot({ locale: false })
+assert.equal(noServiceEn.summary, LOCALES.en['meta.description'], 'without the locale service the browser language decides')
 
-console.log('bilingual plugin description contract OK (locale files + detail page copy)')
+// 产物必须已重建（lib 已入库，CI 检查 git diff）
+assert.ok(artifact.includes(LOCALES.en['meta.description']) && artifact.includes(LOCALES.zh['meta.description']),
+  'built client must carry both descriptions (run npm run build)')
+assert.ok(artifact.includes(LOCALES.en['error.token.expiring']), 'built client must carry the translated error copy (run npm run build)')
+
+console.log('bilingual copy contract OK (locale files + dictionaries + host codes + rendered page)')

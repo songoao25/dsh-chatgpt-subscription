@@ -16,7 +16,7 @@ assert.ok(existsSync(patchPath), 'bundle patch must exist')
 assert.ok(existsSync(join(root, pkg.main)), 'host entry must exist')
 assert.match(readFileSync(patchPath, 'utf8'), /- insert:/)
 
-assert.match(source, /inject:\s*\['slots'\]/, 'client must wait on the public slots service')
+assert.match(source, /inject:\s*\['slots',\s*'locale'\]/, 'client must declare the slots and locale services it reads')
 assert.doesNotMatch(source, /slots\.inject\('settings\.section'/, 'global settings section must not be registered')
 assert.match(source, /slots\.inject\('plugins\.bundle\.config'/, 'plugin configuration slot must remain registered')
 assert.match(source, /key:\s*'dsh-chatgpt-subscription'/, 'plugin configuration key must match bundle name')
@@ -40,28 +40,29 @@ assert.match(source, /function installStyles\(\)/, 'client must install a styles
 assert.match(source, /style\.dataset\.pluginCss = id/, 'stylesheet injection must be idempotent via data-plugin-css')
 assert.match(source, /\.cgpt-page \{[^}]*max-width: 100%;/, 'page width cap must be left to the host (.X_2TxG_page > * already pins min(100%, 960px))')
 assert.doesNotMatch(source, /\.cgpt-page \{[^}]*max-width: 760px/, 'page must not hard-cap its width at 760px (it narrows the content against the host and leaves the right edge unreachable)')
-assert.match(source, /\.cgpt-page \{[^}]*gap: 32px;/, 'section gap must match the native detailSections (32px)')
-assert.match(source, /\.cgpt-section \{ display: flex; flex-direction: column; gap: 12px;/, 'section internals must match the native detailSection (12px)')
-// 区块头照原生 sectionHead：基线对齐 + 10px 间距 + 零内边距，标题 14/500/20
-assert.match(source, /\.cgpt-sectionHead \{ display: flex; align-items: baseline; gap: 10px;[^}]*padding: 0;/, 'section head must use the native baseline alignment, 10px gap and zero padding')
-assert.match(source, /\.cgpt-title \{[^}]*font-size: 14px; font-weight: 500; line-height: 20px;/, 'section title must use the native sectionTitle scale (14/500/20)')
-// 文案去重铁律：详情页顶部的 manifest 描述已说明「这是什么插件」，页面内不得再放介绍段
-// （.cgpt-intro 已随重复介绍一起删除，防止回归再次复述）
+// 间距基准 = 宿主 detailSection 的 12px：本页只是详情页里的一个 section，
+// 套 detailSections 的 32px 会在「描述 → 内容 → Components」之间多出一大段空白。
+assert.match(source, /\.cgpt-page \{[^}]*gap: 12px;/, 'page internals must follow the native detailSection rhythm (12px)')
+assert.doesNotMatch(source, /\.cgpt-page \{[^}]*gap: 32px;/, 'the page must not reuse the between-sections rhythm (32px)')
+// 文案去重铁律：详情页顶部已经有插件名与描述，页面内不得再复述标题或介绍段
 assert.doesNotMatch(source, /cgpt-intro/, 'in-page intro must stay removed (the manifest description already covers it)')
+assert.doesNotMatch(source, /cgpt-title|cgpt-sectionHead/, 'the page must not restate the plugin title the host already renders')
 // 行 = 原生 .X_2TxG_row：12px 2px + .5px 下边线（末行无线），不是插件列表的 card 几何
 assert.match(source, /\.cgpt-list \{ display: flex; flex-direction: column; gap: 0;/, 'row list must match the native .rows container (gap 0)')
 assert.match(source, /\.cgpt-row \{[^}]*padding: 12px 2px; border: 0; border-bottom: 0\.5px solid var\(--dsw-alias-border-l2/, 'rows must use the native .row geometry (12px 2px + .5px bottom rule)')
-assert.match(source, /\.cgpt-row:last-child \{ border-bottom: 0; \}/, 'the last row must drop its rule like the native .row:last-child')
+assert.match(source, /\.cgpt-row:first-child \{ padding-top: 0; \}/, 'the first row must sit flush with the description above it')
+assert.match(source, /\.cgpt-row:last-child \{ padding-bottom: 0; border-bottom: 0; \}/, 'the last row must drop its rule and padding like the native .row:last-child')
 assert.doesNotMatch(source, /\.cgpt-row \{[^}]*margin: 0 -8px/, 'rows must not use the card negative margin (it gets clipped by the collapse container)')
 assert.match(source, /\.cgpt-rowTitle \{[^}]*font-size: 13\.5px; font-weight: 500; line-height: 20px;/, 'row title must match the measured native rowId scale (13.5/500/20)')
 assert.match(source, /\.cgpt-rowDesc \{[^}]*font-size: 11\.5px; line-height: 16px; color: var\(--dsw-alias-label-tertiary\)/, 'row description must match the native .X_2TxG_rowModule scale (11.5/16 tertiary)')
 // 横向对齐铁律：内容块不得自带左右内边距
-assert.doesNotMatch(source, /\.cgpt-(?:sectionHead|intro|note|alerts) \{[^}]*padding: 0 8px/, 'content blocks must not add their own 8px horizontal padding (it misaligns everything against the host)')
-// 错误/警示照原生 failure / banner 形态，而不是把「错误」单占一行再甩出正文
+assert.doesNotMatch(source, /\.cgpt-(?:intro|note|alerts|loading) \{[^}]*padding: 0 8px/, 'content blocks must not add their own 8px horizontal padding (it misaligns everything against the host)')
+// 错误照原生 failure / reason 形态，而不是把「错误」单占一行再甩出正文
 assert.match(source, /\.cgpt-alert--error \{[^}]*display: flex; align-items: center; gap: 10px; color: var\(--dsw-alias-state-error-primary[^}]*overflow-wrap: anywhere; white-space: pre-wrap;/, 'error must use the native failure/reason form')
-assert.match(source, /\.cgpt-alert--warning \{[^}]*background: color-mix\(in srgb, var\(--dsw-alias-state-warning-primary[^}]*border-radius: 10px; padding: 8px 12px;/, 'warning must use the native banner form')
+// 没有用到的样式一律不留（写死的主按钮/警示条几何是死代码）
+assert.doesNotMatch(source, /\.cgpt-(?:btn--primary|alert--warning|alertActions|note--pre|status|section|sectionCount)\b/, 'unused style rules must be deleted rather than kept as dead code')
+assert.doesNotMatch(source, /cgpt-alertActions/, 'the error alert must not carry a second copy of the status row controls')
 assert.match(source, /\.cgpt-btn \{[^}]*display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 28px; border: 0\.5px solid var\(--dsw-alias-border-l3\)[^}]*border-radius: 14px; padding: 0 10px; font-size: 12px; font-weight: 400;/, 'buttons must use the native small capsule geometry as a fallback')
-assert.match(source, /\.cgpt-btn--primary \{[^}]*background: var\(--dsw-alias-button-primary-fill, var\(--dsw-alias-label-primary\)\); color: var\(--dsw-alias-label-primary-foreground, #fff\);/, 'primary button must use the native button token family')
 assert.match(source, /@media \(prefers-reduced-motion: reduce\)/, 'motion must respect the reduced-motion preference')
 assert.doesNotMatch(source, /cardStyle|btnPrimary|btnSecondary|btnDanger/, 'the inline card style objects must be gone')
 assert.doesNotMatch(source, /style:\s*\{/, 'no inline style props may remain in the page component')
