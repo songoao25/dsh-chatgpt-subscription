@@ -26,6 +26,18 @@
 - **插件描述中英双语**：新增 `locale/en.json` 与 `locale/zh.json` 提供 `meta.title` / `meta.description`，`package.json` exports 放行 `./locale/*.json`（不放行 DSH 就解析不到）；插件列表卡片读 locale 文件，详情页顶部读 client bundle 的描述槽位，两处同一句话，随 DSH 界面语言切换
 - **描述文案去 AI 味**：中英两侧改成陈述句（去掉「登录一次，就能…」式营销腔、破折号与感叹号）；新增 `tests/test-locale-copy.mjs` 锁死两侧字段对应、英文兜底一致、营销词黑名单，并真实渲染两种语言下的描述
 
+### Fixed
+
+- **配置页整块消失（回归，已修复）**：client half 没在 `inject` 里声明 `locale` 就访问 `ctx.locale`，cordis 直接抛 `cannot get property "locale" without inject`，配置区块渲染失败——插件名与描述来自 locale 文件，所以看起来「只剩标题」；现已声明 `inject: ['slots', 'locale']` 并把取值整段包进 try/catch
+
+### Changed
+
+- **全站文案中英双语**：页面文案、按钮、确认弹窗、状态行全部收进 zh / en 字典（60 条，键完全对称），宿主 37 个用户可见错误各带稳定 `code`，前端按语言取文案、字典缺失时退回宿主原文；OAuth 回调页也随浏览器语言切换
+- **间距统一**：本页只是详情页里的一个 section，内部间距改用宿主 detailSection 的 12px（原来套 detailSections 的 32px，凭空多出大段空白），首行去上内边距、末行去下内边距与边线
+- **文案去重与去 AI 味**：删掉页内重复的插件标题、错误块里重复的按钮，状态行不再复述药丸上的「已连接」，错误文案去掉与旁边按钮重复的「请重新绑定」尾巴；清掉死样式（未使用的主按钮 / 警示条 / 状态行 / 预格式规则）
+- **文档同步**：README 中英两侧与 `docs/INSTALL.md` 的按钮名、入口路径、状态名对齐实际界面，去掉「一键」「无需命令行」这类营销腔
+- **测试加固**：client half 改为在「按 cordis 语义授权服务访问」的 ctx 上真实运行（未在 inject 里声明的服务属性一律抛错），并锁死字典键对称、宿主每个错误 code 都有中英两条、英文页不得出现中文
+
 ## [0.2.1] - 2026-09-16
 
 ### Fixed

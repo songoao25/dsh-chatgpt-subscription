@@ -43,13 +43,13 @@ dsh --profile web --dump-config | grep dsh-chatgpt-subscription
 # 应看到 dsh-chatgpt-subscription 行（bundle 层已生效）
 ```
 
-重启后 插件 → 已下载的插件 → chatgpt-subscription 页面出现即安装成功。
+重启后，在 DSH **插件** 页能看到 **chatgpt-subscription** 即安装成功。
 
 ## 绑定 ChatGPT 订阅
 
-1. 打开 DSH **设置**（⚙️）→ 点击 **订阅**（紧挨「模型」下方）。
-2. 点击「**授权登录**」→ 浏览器打开 OpenAI 官方授权页。
-3. 用 ChatGPT 账号登录并同意；页面显示「已绑定」即完成。
+1. 打开 DSH **插件** 页 → 进入 **chatgpt-subscription**。
+2. 点「**绑定 ChatGPT 账号**」→ 浏览器打开 OpenAI 官方授权页。
+3. 用 ChatGPT 账号登录并同意；插件页显示「已连接」即完成。
 4. 新建对话，在模型切换器选择提供商 **ChatGPT** 的模型（如 `gpt-5.6-terra`）对话。
 
 > 若浏览器未自动打开，请允许 DSH 弹窗（页面会以 `window.open` 兜底）。
@@ -76,11 +76,11 @@ dsh plugin --profile web remove dsh-chatgpt-subscription
 
 | 现象 | 原因与处理 |
 |---|---|
-| 插件详情里没有「ChatGPT 订阅」页面 | ① 没重启：需重启 `dsh web`；② 装错 profile：确认启动用的 profile 与安装目标一致；③ `dsh --profile web --dump-config` 里没有 dsh-chatgpt-subscription：重新执行安装 |
-| 点授权登录没反应/浏览器没打开 | ① 检查是否允许 DSH 弹窗；② 重启 DSH 后再试 |
+| 插件详情里没有配置页 | ① 没重启：需重启 `dsh web`；② 装错 profile：确认启动用的 profile 与安装目标一致；③ `dsh --profile web --dump-config` 里没有 dsh-chatgpt-subscription：重新执行安装 |
+| 点绑定没反应/浏览器没打开 | ① 检查是否允许 DSH 弹窗；② 重启 DSH 后再试 |
 | 提示「回调端口被占用」 | 端口 1455 被其他程序占用（如正在运行的 codex 登录流程），关闭占用程序后重试 |
-| 授权超时（5 分钟） | 重新点「授权登录」再试；确认浏览器完成了授权 |
-| 绑定后模型切换器无 ChatGPT | 确认绑定成功（插件详情页显示已绑定）；重启 DSH 让路由注册生效 |
+| 授权超时（5 分钟） | 重新点「绑定 ChatGPT 账号」再试；确认浏览器完成了授权 |
+| 绑定后模型切换器无 ChatGPT | 确认绑定成功（插件页显示「已连接」）；重启 DSH 让路由注册生效 |
 | 对话报错/模型不可用 | 可用模型以套餐为准（如 `gpt-5.3-codex-spark` 需更高计划）；检查订阅额度 |
 | 安装报 `pnpm not found` | 安装 pnpm：`npm i -g pnpm` 或 `corepack enable` |
 | 想彻底移除插件影响 | `./uninstall.sh` + 重启 DSH |
