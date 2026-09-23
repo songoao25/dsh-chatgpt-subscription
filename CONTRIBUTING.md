@@ -28,7 +28,7 @@
 - 本项目是 DeepSeek Harness 的静态 bundle 插件；
 - 主要文件结构：
   - `src/host.js` — host 半（OAuth 绑定流程、令牌看护、路由注册、RPC）
-  - `src/client-bundle.js` — client 半（设置页「订阅」）
+  - `src/client-bundle.js` — client 半（插件详情页「ChatGPT 订阅」配置）
   - `scripts/build.mjs` — 构建脚本（`src/` → `lib/`）
   - `tests/` — 测试（`run-all.mjs` 入口）
 - 构建与测试：
