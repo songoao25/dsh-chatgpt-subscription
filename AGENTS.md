@@ -10,7 +10,7 @@
 - `src/client-bundle.js` — client 半：插件详情页「ChatGPT 订阅」配置（`plugins.bundle.config`，key=`dsh-chatgpt-subscription`）
 - `scripts/build.mjs` — 构建（src/ → lib/；client 包装为 `window.__ModuleLoader__.load({ id: "dsh-chatgpt-subscription", ... })`）
 - `tests/` — `run-all.mjs` 入口 + `test-codex-host.js`（36 断言，零真实网络/零真实 auth.json）
-- `cordis.patch.yml` — bundle 挂载行（id 必须为 `dsh-chatgpt-subscription`）
+- `cordis.patch.yml` — bundle 挂载行（`name` 必须是包名 `dsh-chatgpt-subscription`；`id` 是用户覆盖用的行键，取短名 `chatgpt-subscription`，**不得与 name 相同**——相同的话插件卡片的「行 id / 模块名」两行会是同一串字）
 - `lib/` — 构建产物，**已提交**（支持直接 `dsh plugin add`，勿从 git 移除）
 
 ## 关键约束（不可违背）

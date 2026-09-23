@@ -14,7 +14,13 @@ assert.deepEqual(pkg.dsh.client.inject, [], 'plugin-page configuration must not 
 assert.ok(!pkg.dsh.client.inject.includes(retiredRuntime), 'retired client runtime must not be injected')
 assert.ok(existsSync(patchPath), 'bundle patch must exist')
 assert.ok(existsSync(join(root, pkg.main)), 'host entry must exist')
-assert.match(readFileSync(patchPath, 'utf8'), /- insert:/)
+const patch = readFileSync(patchPath, 'utf8')
+assert.match(patch, /- insert:/)
+// 行 id ≠ 模块名：DSH 的插件卡片把「行 id」和「模块名」各占一行（只有与标题相同时才省略其中一行），
+// 两者取同一个字符串就会在 Components 里显示成重复的两行。
+const patchRow = patch.match(/- id:\s*([^\s]+)\s*\n\s*name:\s*'?([^'\n]+)'?/)
+assert.ok(patchRow, 'the bundle patch must declare exactly one row with id and name')
+assert.notEqual(patchRow[1], patchRow[2], 'the row id must differ from the module name (identical values render as a duplicated line)')
 
 assert.match(source, /inject:\s*\['slots',\s*'locale'\]/, 'client must declare the slots and locale services it reads')
 assert.doesNotMatch(source, /slots\.inject\('settings\.section'/, 'global settings section must not be registered')
