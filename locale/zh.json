@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "ChatGPT 订阅",
+    "description": "用 OpenAI 官方 OAuth 绑定 ChatGPT 账号，在 DSH 里使用 ChatGPT 模型对话，消耗你的订阅额度。"
+  }
+}
