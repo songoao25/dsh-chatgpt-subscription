@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # 手动补跑：release-please 的发布分支不会收到 pull_request 事件（推送方是
+  # GITHUB_TOKEN），没有这个入口时它永远等不到必需的 CI 检查，发布 PR 无法合并。
+  workflow_dispatch:
 
 jobs:
   CI:
