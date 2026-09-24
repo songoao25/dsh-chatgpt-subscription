@@ -17,9 +17,19 @@ done
 
 command -v dsh >/dev/null 2>&1 || { echo "错误：未找到 dsh CLI"; exit 1; }
 
-echo "==> 从 profile '$PROFILE' 卸载 dsh-chatgpt-subscription"
-if ! dsh plugin --profile "$PROFILE" remove dsh-chatgpt-subscription; then
-  echo "  ⚠ 插件移除失败（可能已卸载或 profile 不存在），继续清理配置。"
+IS_DESKTOP=0
+case "$(printf '%s' "$PROFILE" | tr '[:upper:]' '[:lower:]')" in
+  desktop) IS_DESKTOP=1 ;;
+esac
+
+if [[ "$IS_DESKTOP" == "1" ]]; then
+  echo "==> profile 'desktop' 由桌面端客户端自己管理，跳过命令行插件移除。"
+  echo "    请在客户端内「插件」页卸载 dsh-chatgpt-subscription；下面继续清理本插件的配置与凭据。"
+else
+  echo "==> 从 profile '$PROFILE' 卸载 dsh-chatgpt-subscription"
+  if ! dsh plugin --profile "$PROFILE" remove dsh-chatgpt-subscription; then
+    echo "  ⚠ 插件移除失败（可能已卸载或 profile 不存在），继续清理配置。"
+  fi
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -47,6 +57,10 @@ rm -rf -- "$DATA_DIR"
 
 echo
 echo "✔ 卸载完成。"
-echo "  ⚠ 运行中的 DeepSeek Harness 把配置/凭据保存在内存里——请重启 dsh $PROFILE 使清理生效。"
+echo "  ⚠ 运行中的 DeepSeek Harness 把配置/凭据保存在内存里——请重启 DSH 使清理生效。"
 echo "  ~/.codex/auth.json（codex CLI 自己的登录态）已保留，未做任何改动。"
-echo "  下一步：重启 DeepSeek Harness（dsh $PROFILE），模型切换器中的 ChatGPT 提供商自动消失。"
+if [[ "$IS_DESKTOP" == "1" ]]; then
+  echo "  别忘了在客户端「插件」页把 dsh-chatgpt-subscription 也卸载掉。"
+else
+  echo "  下一步：重启 DSH，模型切换器中的 ChatGPT 提供商自动消失。"
+fi

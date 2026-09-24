@@ -24,13 +24,46 @@ A [DeepSeek Harness](https://github.com/deepseek-ai) plugin: sign in with your C
 
 ## Requirements
 
-- [DeepSeek Harness](https://github.com/deepseek-ai) (`dsh` CLI) running the web interface (`dsh web`)
-- [pnpm](https://pnpm.io/) (used by `dsh plugin`)
+- DeepSeek Harness — the **desktop app** or a CLI profile with the web interface (`dsh web`)
+- [pnpm](https://pnpm.io/) (used by `dsh plugin` and by the plugin page's install box)
 - A ChatGPT **Plus** or **Pro** subscription (or a plan that includes Codex quota)
 
 ## Installation
 
-### Option 1 — One-command script (recommended)
+### Option 1 — Install inside DSH: **Plugins → Add plugin** (works in the desktop app)
+
+Open **Plugins → Add plugin** and paste this repository address into the "package name or address" box:
+
+```
+https://github.com/SONGOAO25/dsh-chatgpt-subscription
+```
+
+The package lives at the repository root and `lib/` is committed, so installing by address runs no build step and asks for no build-script approval. The same box also accepts:
+
+- the package name `dsh-chatgpt-subscription` — installs the released version from npm;
+- an absolute path to a checkout of this repository — for development.
+
+This is the way to install in the **desktop app**: DSH manages its `desktop` profile itself and the CLI rejects `dsh plugin --profile desktop`, so the plugin page is the only install path there.
+
+Then **restart DSH** — plugins are composed when the host process starts, so a page refresh is not enough.
+
+### Option 2 — `dsh plugin` on the command line
+
+Use the profile you actually boot (`dsh web` boots the `web` profile):
+
+```bash
+# the released version from npm
+dsh plugin --profile web add dsh-chatgpt-subscription
+
+# or the repository's default branch (no build runs; lib/ is committed)
+dsh plugin --profile web add https://github.com/SONGOAO25/dsh-chatgpt-subscription
+```
+
+`--profile desktop` is refused by design — that profile belongs to the desktop app. Install through **Plugins → Add plugin** there instead.
+
+### Option 3 — One-command script (a `link:` install)
+
+For development, or to run unreleased code:
 
 ```bash
 git clone https://github.com/SONGOAO25/dsh-chatgpt-subscription.git
@@ -38,25 +71,30 @@ cd dsh-chatgpt-subscription
 ./install.sh                # installs to the "web" profile; use --profile <name> to override
 ```
 
-### Option 2 — dsh plugin command
+A `link:` install tracks your checkout instead of npm — see [Updating](#updating).
 
-```bash
-git clone https://github.com/SONGOAO25/dsh-chatgpt-subscription.git
-cd dsh-chatgpt-subscription
-npm run build               # build lib/ from src/
-dsh plugin --profile web add .
-```
+> If the plugin page reports **no matching plugin** or npm answers `404` for the package name, that release has not been published to npm: install by repository address instead.
 
-> **Restart `dsh web` after installing.** Plugins are composed when the host process starts; a page refresh alone is not enough.
+After installing, open **Plugins → ChatGPT Subscription**. See [docs/INSTALL.md](docs/INSTALL.md) for the full install, update and troubleshooting guide.
 
 ## Usage
 
-1. Restart `dsh web`, then open **Plugins** and click **ChatGPT Subscription**.
+1. Restart DSH, then open **Plugins** and click **ChatGPT Subscription**.
 2. Click **Sign in with ChatGPT** — your browser opens the official OpenAI sign-in page.
 3. Sign in with your ChatGPT account and approve. The page shows **Connected** when done.
 4. Open a new conversation, switch the model to a ChatGPT model (provider **ChatGPT**, e.g. `gpt-5.6-terra`) and chat — usage counts against your subscription.
 
 > If the browser tab doesn't open automatically, the page also calls `window.open` as a fallback; allow pop-ups for DSH if prompted.
+
+## Updating
+
+| How you installed | How to update |
+|---|---|
+| Repository address (plugin page or CLI) | run the same address install again, then restart DSH |
+| npm package name | `dsh plugin --profile web add dsh-chatgpt-subscription@latest`, then restart DSH |
+| `link:` — one-command script or a local checkout | `git -C <repo> fetch origin && git -C <repo> merge --ff-only origin/main && node <repo>/scripts/build.mjs`, then restart DSH |
+
+Updating is manual — nothing changes on disk until you run the command. Details: [docs/INSTALL.md](docs/INSTALL.md#更新).
 
 ## Security
 
@@ -67,6 +105,8 @@ dsh plugin --profile web add .
 
 ## Uninstall
 
+In the desktop app, remove the plugin from **Plugins**. On the CLI:
+
 ```bash
 cd dsh-chatgpt-subscription
 ./uninstall.sh              # removes the plugin and the injected route/credential
@@ -75,6 +115,12 @@ cd dsh-chatgpt-subscription
 Uninstall keeps `~/.codex/auth.json` (your Codex CLI login) and only cleans what this plugin added: the binding flag, the `openai-codex` provider route, and the `OPENAI_CODEX_API_KEY` credential.
 
 ## FAQ
+
+**Q: How do I install this on the desktop app?**
+Open **Plugins → Add plugin** and paste `https://github.com/SONGOAO25/dsh-chatgpt-subscription`. The desktop app manages its own `desktop` profile, so `dsh plugin --profile desktop` is refused — the plugin page is the way in.
+
+**Q: The plugin page asks me to approve a build script.**
+The installed manifest declares an install-time script (`prepare` / `prepack`). This repository's manifest keeps only `prepublishOnly`, so installing by the current repository address runs no build and asks for no approval — reinstall from the latest commit's address.
 
 **Q: Do I need a ChatGPT Plus subscription?**
 Yes — the plugin connects your ChatGPT account; chatting with ChatGPT models consumes your subscription quota (models available depend on your plan, e.g. `gpt-5.3-codex-spark` requires a higher plan).

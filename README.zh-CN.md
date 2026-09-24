@@ -24,13 +24,46 @@
 
 ## 前置条件
 
-- 已安装 [DeepSeek Harness](https://github.com/deepseek-ai)（`dsh` CLI）并使用 Web 界面（`dsh web`）
-- 已安装 [pnpm](https://pnpm.io/)（`dsh plugin` 依赖）
+- 已安装 DeepSeek Harness —— **桌面端客户端**，或使用 Web 界面的 CLI profile（`dsh web`）
+- 已安装 [pnpm](https://pnpm.io/)（`dsh plugin` 与插件页的安装框都依赖它）
 - 拥有 ChatGPT **Plus** 或 **Pro** 订阅（或包含 Codex 额度的套餐）
 
 ## 安装
 
-### 方式一：一键脚本（推荐）
+### 方式一：在 DSH 里装 —— **插件 → 添加插件**（桌面端也用这条）
+
+打开 DSH 的 **插件 → 添加插件**，在「包名或地址」里填入仓库地址：
+
+```
+https://github.com/SONGOAO25/dsh-chatgpt-subscription
+```
+
+包就在仓库根目录，且 `lib/` 已入库，所以填地址安装**不跑构建、也不会弹「待批准的构建脚本」**。同一个框也接受：
+
+- 包名 `dsh-chatgpt-subscription` —— 装 npm 上已发布的版本；
+- 本仓库工作副本的绝对路径 —— 用于开发。
+
+**桌面端客户端只能用这条**：DSH 的 `desktop` profile 由客户端自己管理，命令行 `dsh plugin --profile desktop` 会被直接拒绝。
+
+装完**重启 DSH** —— 插件在宿主进程启动时组合加载，仅刷新页面不够。
+
+### 方式二：命令行的 `dsh plugin`
+
+用你实际启动的那个 profile（`dsh web` 启动的是 `web`）：
+
+```bash
+# npm 上已发布的版本
+dsh plugin --profile web add dsh-chatgpt-subscription
+
+# 或跟随仓库默认分支（不跑构建，lib/ 已入库）
+dsh plugin --profile web add https://github.com/SONGOAO25/dsh-chatgpt-subscription
+```
+
+`--profile desktop` 是被有意拒绝的 —— 那个 profile 归桌面端客户端管，请改用 **插件 → 添加插件**。
+
+### 方式三：一键脚本（产生 `link:` 安装）
+
+用于开发，或想跑未发布的代码：
 
 ```bash
 git clone https://github.com/SONGOAO25/dsh-chatgpt-subscription.git
@@ -38,25 +71,30 @@ cd dsh-chatgpt-subscription
 ./install.sh                # 默认安装到 web profile；可用 --profile <name> 指定
 ```
 
-### 方式二：dsh 插件命令
+`link:` 安装跟随你的工作副本而不是 npm —— 更新方式见[更新版本](#更新版本)。
 
-```bash
-git clone https://github.com/SONGOAO25/dsh-chatgpt-subscription.git
-cd dsh-chatgpt-subscription
-npm run build               # 由 src/ 构建 lib/
-dsh plugin --profile web add .
-```
+> 如果插件页报**「未找到相关插件」**，或 npm 对该包名返回 `404`，说明这个版本还没发布到 npm：改填仓库地址安装即可。
 
-> **安装后需重启 `dsh web` 生效** —— 插件在宿主进程启动时组合加载，仅刷新页面不够。
+装好后进入 **插件 → ChatGPT 订阅**。完整的安装 / 更新 / 故障排查见 [docs/INSTALL.md](docs/INSTALL.md)。
 
 ## 使用方法
 
-1. 重启 `dsh web`，打开左侧 **插件** 页，点进 **ChatGPT 订阅**。
+1. 重启 DSH，打开 **插件** 页，点进 **ChatGPT 订阅**。
 2. 点「**绑定 ChatGPT 账号**」——浏览器打开 OpenAI 官方登录页。
 3. 用 ChatGPT 账号登录并同意授权；页面显示「**已连接**」即完成。
 4. 新建对话，在模型切换器选择提供商 **ChatGPT** 的模型（如 `gpt-5.6-terra`）对话，额度计入订阅。
 
 > 若浏览器没有自动打开，页面会以 `window.open` 兜底；请允许 DSH 的弹窗。
+
+## 更新版本
+
+| 你的安装方式 | 更新命令 |
+|---|---|
+| 仓库地址（插件页或命令行） | 再执行一次同样的地址安装，然后重启 DSH |
+| 包名（npm） | `dsh plugin --profile web add dsh-chatgpt-subscription@latest`，然后重启 DSH |
+| `link:`（一键脚本或本地代码） | `git -C <仓库> fetch origin && git -C <仓库> merge --ff-only origin/main && node <仓库>/scripts/build.mjs`，然后重启 DSH |
+
+更新是手动的：磁盘上的一切改动都要等你执行命令之后才发生。详见 [docs/INSTALL.md](docs/INSTALL.md#更新)。
 
 ## 安全说明
 
@@ -67,6 +105,8 @@ dsh plugin --profile web add .
 
 ## 卸载
 
+桌面端客户端：在 **插件** 页里卸载。命令行：
+
 ```bash
 cd dsh-chatgpt-subscription
 ./uninstall.sh              # 移除插件及注入的路由/凭据
@@ -75,6 +115,12 @@ cd dsh-chatgpt-subscription
 卸载保留 `~/.codex/auth.json`（你的 Codex CLI 登录态），只清理本插件添加的内容：绑定标记、`openai-codex` 提供商路由、`OPENAI_CODEX_API_KEY` 凭据。
 
 ## 常见问题
+
+**问：桌面端客户端怎么装？**
+打开 **插件 → 添加插件**，填入 `https://github.com/SONGOAO25/dsh-chatgpt-subscription`。桌面端自己管理 `desktop` profile，`dsh plugin --profile desktop` 会被拒绝——插件页就是入口。
+
+**问：安装时提示要批准构建脚本？**
+那是装到的清单里声明了安装期脚本（`prepare` / `prepack`）。本仓库的清单只保留 `prepublishOnly`，所以填最新提交的仓库地址安装**不跑构建、也不需要批准**——重新用最新地址装一次即可。
 
 **问：需要 ChatGPT Plus 订阅吗？**
 需要。插件连接你的 ChatGPT 账号，使用 ChatGPT 模型对话消耗订阅额度（可用模型视套餐而定，如 `gpt-5.3-codex-spark` 需更高套餐）。
@@ -89,7 +135,7 @@ cd dsh-chatgpt-subscription
 不会。插件写入同一个标准位置 `~/.codex/auth.json` 并保留其结构；解绑也不删除它。
 
 **问：能看到我的额度吗？**
-安装配套插件 [Bottom Info Bar](https://github.com/SONGOAO25/dsh-bottom-info-bar)——它读取本插件维护的令牌，在底部信息栏显示 ChatGPT 额度（剩余百分比与重置时间）。
+安装配套插件 [Bottom Info Bar](https://github.com/songoao25/dsh-bottom-info-bar)——它读取本插件维护的令牌，在底部信息栏显示 ChatGPT 额度（剩余百分比与重置时间）。
 
 ## 许可证
 
