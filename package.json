@@ -1,6 +1,6 @@
 {
   "name": "dsh-chatgpt-subscription",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Sign in with your ChatGPT account to use ChatGPT models in DSH.",
   "keywords": [
     "deepseek-harness",

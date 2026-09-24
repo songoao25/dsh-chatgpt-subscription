@@ -2,6 +2,21 @@
 
 本项目的版本记录遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.3.0](https://github.com/songoao25/dsh-chatgpt-subscription/compare/v0.2.2...v0.3.0) (2026-09-24)
+
+
+### Features
+
+* **i18n:** 插件描述适配中英双语 ([#15](https://github.com/songoao25/dsh-chatgpt-subscription/issues/15)) ([c814ca4](https://github.com/songoao25/dsh-chatgpt-subscription/commit/c814ca41b5122cd7714061ccbc22cf6b144d3b86))
+
+
+### Bug Fixes
+
+* **install:** 不发布 npm 包，安装只走仓库地址 ([#21](https://github.com/songoao25/dsh-chatgpt-subscription/issues/21)) ([21d1cc5](https://github.com/songoao25/dsh-chatgpt-subscription/commit/21d1cc53ddb6665efe4a567b0b17f3132005ec8f))
+* **install:** 安装方式适配 DSH 插件页与桌面端客户端 ([#20](https://github.com/songoao25/dsh-chatgpt-subscription/issues/20)) ([96bea26](https://github.com/songoao25/dsh-chatgpt-subscription/commit/96bea2663eb8a8e773147e393ad7233667ffa026))
+* **patch:** 挂载行 id 与包名分开，Components 里不再重复同一串字 ([#17](https://github.com/songoao25/dsh-chatgpt-subscription/issues/17)) ([999599a](https://github.com/songoao25/dsh-chatgpt-subscription/commit/999599a472e9c82f45eaac060ba7f879fbed8f17))
+* **ui:** 修复配置页消失，全站文案中英双语并统一间距 ([#16](https://github.com/songoao25/dsh-chatgpt-subscription/issues/16)) ([70a26c0](https://github.com/songoao25/dsh-chatgpt-subscription/commit/70a26c0ef670cb7e3f43162adf291f5006fbbea7))
+
 ## [0.2.2](https://github.com/songoao25/dsh-chatgpt-subscription/compare/v0.2.1...v0.2.2) (2026-09-22)
 
 
