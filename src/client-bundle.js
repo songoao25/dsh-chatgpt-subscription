@@ -146,14 +146,18 @@ module.exports = {
 
     // RPC 封装（webServer HTTP）
     const PREFIX = '/_dsh/dsh-chatgpt-subscription';
+    // DSH 0.1.7 desktop host enforces POST for state-changing RPCs, even
+    // when the call has no JSON arguments. Keep read-only status polling GET.
+    const MUTATING_RPC = { startCodexOAuth: true, unbindCodex: true };
     function rpc(method, args) {
       const url = PREFIX + '/' + method;
       const controller = new AbortController();
       const timeout = window.setTimeout(function () { controller.abort(); }, 15000);
+      const mutating = Object.hasOwn(MUTATING_RPC, method);
       return fetch(url, {
-        method: args ? 'POST' : 'GET',
+        method: mutating ? 'POST' : 'GET',
         headers: { 'content-type': 'application/json' },
-        body: args ? JSON.stringify(args) : undefined,
+        body: mutating ? JSON.stringify(args || {}) : undefined,
         signal: controller.signal,
       }).then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (body) {
