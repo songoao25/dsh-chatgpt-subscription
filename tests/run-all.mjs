@@ -9,6 +9,7 @@ const files = [
   'test-alpha4-client-contract.mjs',
   'test-locale-copy.mjs',
   'test-install-docs.mjs',
+  'test-release-chain.mjs',
   'test-codex-host.js',
 ]
 

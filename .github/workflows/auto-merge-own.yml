@@ -2,6 +2,14 @@ name: Auto-merge own PRs
 
 # 僅倉庫擁有者 (repository_owner) 的 PR 自動開啟 auto-merge（CI 通過後自動 squash），
 # 其他人保持手動，需人工審核與手動合併。符合業界 trust-by-author 慣例。
+#
+# 2026-09-24 「全自动发布链」补丁：
+#   1) release-please 的发布 PR 也自动合并（同仓 release-please-- 分支兜底识别；
+#      若 release-please 使用 AUTOMATION_TOKEN 创建 PR，作者本身就是 owner，
+#      第一条规则已经覆盖）。这样「修复合入 → 版本 PR → tag/Release」全程无需点按。
+#   2) 合并改用 AUTOMATION_TOKEN（PAT）：GITHUB_TOKEN 产生的 push 不会触发其他
+#      workflow，会造成「合并后 Release Please 不再运行、发布 PR 永远停在旧状态」。
+#      未配置该 secret 时回退 GITHUB_TOKEN，行为与以前完全一致。
 on:
   pull_request_target:
     types: [opened, reopened, synchronize, ready_for_review]
@@ -14,12 +22,16 @@ permissions:
 
 jobs:
   enable-auto-merge:
-    if: github.event.pull_request.user.login == github.repository_owner && github.event.pull_request.draft == false
+    if: >-
+      github.event.pull_request.draft == false
+      && (github.event.pull_request.user.login == github.repository_owner
+        || (startsWith(github.event.pull_request.head.ref, 'release-please--')
+          && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-latest
     steps:
-      - name: Enable auto-merge (squash) for owner PR
+      - name: Enable auto-merge (squash) for owner/release PR
         run: |
-          echo "Owner PR #${{ github.event.pull_request.number }} by ${{ github.event.pull_request.user.login }} (owner=${{ github.repository_owner }}) → enable auto-merge (squash)"
+          echo "PR #${{ github.event.pull_request.number }} by ${{ github.event.pull_request.user.login }} (owner=${{ github.repository_owner }}, head=${{ github.event.pull_request.head.ref }}) → enable auto-merge (squash)"
           gh pr merge --auto --squash "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}

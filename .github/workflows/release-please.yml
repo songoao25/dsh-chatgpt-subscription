@@ -2,8 +2,7 @@ name: Release Please
 on:
   push:
     branches: [main]
-  # 手动补跑：auto-merge 用 GITHUB_TOKEN 推送的合并不会触发 push 事件，
-  # 发布 PR 会因此停在旧状态（2026-09-24 的 #20/#21 就是这样漏掉的）。
+  # 手动补跑入口（配置 AUTOMATION_TOKEN 后正常不需要用；未配置时靠它兜底）。
   workflow_dispatch:
 permissions:
   contents: write
@@ -15,3 +14,10 @@ jobs:
       - uses: google-github-actions/release-please-action@v4
         with:
           release-type: node
+          # AUTOMATION_TOKEN（PAT）优先，GITHUB_TOKEN 有两个硬伤：
+          #   ① 它推的分支不被 pull_request 事件信任，发布 PR 的必需检查 CI 会停在
+          #      action_required（approve API 对同仓分支返回 404），PR 永远无法合并；
+          #   ② 它产生的 push 不触发其他 workflow，合并到 main 后本 workflow 不会再跑，
+          #      发布 PR 就停在旧状态。
+          # 没配 secret 时回退 GITHUB_TOKEN，行为与以前一致（手动 dispatch 兜底）。
+          token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
