@@ -38,10 +38,9 @@
 https://github.com/SONGOAO25/dsh-chatgpt-subscription
 ```
 
-包就在仓库根目录，且 `lib/` 已入库，所以填地址安装**不跑构建、也不会弹「待批准的构建脚本」**。同一个框也接受：
+包就在仓库根目录，且 `lib/` 已入库，所以填地址安装**不跑构建、也不会弹「待批准的构建脚本」**。同一个框也接受本仓库工作副本的绝对路径（用于开发）。
 
-- 包名 `dsh-chatgpt-subscription` —— 装 npm 上已发布的版本；
-- 本仓库工作副本的绝对路径 —— 用于开发。
+**本插件不发布 npm 包**：那一栏填包名 `dsh-chatgpt-subscription` 只会报「未找到相关插件」，请始终填上面的仓库地址。
 
 **桌面端客户端只能用这条**：DSH 的 `desktop` profile 由客户端自己管理，命令行 `dsh plugin --profile desktop` 会被直接拒绝。
 
@@ -52,12 +51,11 @@ https://github.com/SONGOAO25/dsh-chatgpt-subscription
 用你实际启动的那个 profile（`dsh web` 启动的是 `web`）：
 
 ```bash
-# npm 上已发布的版本
-dsh plugin --profile web add dsh-chatgpt-subscription
-
-# 或跟随仓库默认分支（不跑构建，lib/ 已入库）
+# 跟随仓库默认分支（不跑构建，lib/ 已入库）
 dsh plugin --profile web add https://github.com/SONGOAO25/dsh-chatgpt-subscription
 ```
+
+命令行同样没有包名可填——本插件不发布 npm 包，填包名只会报「未找到相关插件」。
 
 `--profile desktop` 是被有意拒绝的 —— 那个 profile 归桌面端客户端管，请改用 **插件 → 添加插件**。
 
@@ -71,9 +69,9 @@ cd dsh-chatgpt-subscription
 ./install.sh                # 默认安装到 web profile；可用 --profile <name> 指定
 ```
 
-`link:` 安装跟随你的工作副本而不是 npm —— 更新方式见[更新版本](#更新版本)。
+`link:` 安装跟随你的工作副本，而不是仓库默认分支 —— 更新方式见[更新版本](#更新版本)。
 
-> 如果插件页报**「未找到相关插件」**，或 npm 对该包名返回 `404`，说明这个版本还没发布到 npm：改填仓库地址安装即可。
+> 请用仓库地址安装：本插件不在 npm 上，填包名一定会报**「未找到相关插件」**。
 
 装好后进入 **插件 → ChatGPT 订阅**。完整的安装 / 更新 / 故障排查见 [docs/INSTALL.md](docs/INSTALL.md)。
 
@@ -91,7 +89,6 @@ cd dsh-chatgpt-subscription
 | 你的安装方式 | 更新命令 |
 |---|---|
 | 仓库地址（插件页或命令行） | 再执行一次同样的地址安装，然后重启 DSH |
-| 包名（npm） | `dsh plugin --profile web add dsh-chatgpt-subscription@latest`，然后重启 DSH |
 | `link:`（一键脚本或本地代码） | `git -C <仓库> fetch origin && git -C <仓库> merge --ff-only origin/main && node <仓库>/scripts/build.mjs`，然后重启 DSH |
 
 更新是手动的：磁盘上的一切改动都要等你执行命令之后才发生。详见 [docs/INSTALL.md](docs/INSTALL.md#更新)。
@@ -121,6 +118,9 @@ cd dsh-chatgpt-subscription
 
 **问：安装时提示要批准构建脚本？**
 那是装到的清单里声明了安装期脚本（`prepare` / `prepack`）。本仓库的清单只保留 `prepublishOnly`，所以填最新提交的仓库地址安装**不跑构建、也不需要批准**——重新用最新地址装一次即可。
+
+**问：npm 上有这个包吗？**
+没有。插件只从本仓库分发——安装时填仓库地址（插件页或 `dsh plugin add` 都可以）。`package.json` 里的 `name` 是 DSH 的模块名，不是已发布的 npm 包。
 
 **问：需要 ChatGPT Plus 订阅吗？**
 需要。插件连接你的 ChatGPT 账号，使用 ChatGPT 模型对话消耗订阅额度（可用模型视套餐而定，如 `gpt-5.3-codex-spark` 需更高套餐）。

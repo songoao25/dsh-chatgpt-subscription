@@ -14,7 +14,6 @@
 - `lib/` — 构建产物，**已提交**（支持直接 `dsh plugin add` / 插件页填 GitHub 地址，勿从 git 移除）
 - `README.md` / `README.zh-CN.md` / `docs/INSTALL.md` — 用户安装入口文档，三条路径必须始终与 DSH 实际能力一致（见「安装方式」）
 - `install.sh` / `uninstall.sh` — 一键安装/卸载（默认 web profile；desktop profile 会被这两支脚本明确拒绝并引导到客户端插件页）
-- `.github/workflows/publish-npm.yml` — 打 `v*.*.*` 标签时发 npm（校验「标签版本 == package.json 版本」；需要仓库 secret `NPM_TOKEN`）
 
 ## 关键约束（不可违背）
 
@@ -31,15 +30,15 @@
 
 用户装插件只有 DSH 提供的三条路，文档、脚本、清单必须同时支持；改任何一条都要同步三处文档 + `test-install-docs.mjs`：
 
-1. **插件页「添加插件」**（桌面端客户端唯一入口）——「包名或地址」可填包名、GitHub 仓库地址、本地目录绝对路径。**仓库根必须就是插件包**（`package.json` + `cordis.patch.yml` 在根），且 `lib/` 已入库：这样填仓库地址零构建、零授权即可安装。
+1. **插件页「添加插件」**（桌面端客户端唯一入口）——「包名或地址」框支持包名 / GitHub 仓库地址 / 本地目录绝对路径，但**本仓库只用后两者**（不发布 npm）。**仓库根必须就是插件包**（`package.json` + `cordis.patch.yml` 在根），且 `lib/` 已入库：这样填仓库地址零构建、零授权即可安装。
 2. **命令行** `dsh plugin --profile <name> add <包名|地址|目录>`——只对 CLI 自建 profile 有效（`dsh web` → `web`）。
-3. **一键脚本**（产生 `link:` 安装）——跟随工作副本，不是 npm 版本。
+3. **一键脚本**（产生 `link:` 安装）——跟随工作副本，不是仓库默认分支的版本。
 
 硬约束：
 
 - **桌面端客户端不能用命令行**：DSH 的 `desktop` profile 由 Electron 应用独占管理，`dsh plugin --profile desktop ...` 会被 CLI 直接拒绝。文档与脚本一律引导用户到客户端 **插件 → 添加插件**。
-- **`package.json` 只允许 `prepublishOnly`**（发 npm 时重建 `lib/`）。**禁止加 `prepare` / `prepack` / `postinstall`**：pnpm 对 git 依赖会执行 `prepare` 并在未放行时直接失败（`ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`），会让「填 GitHub 地址」这条主流安装路径变成「待批准的构建脚本」卡点（已实测：带 `prepare` 的清单装 git 地址 exit=1，只留 `prepublishOnly` 则 exit=0 且零构建）。
-- **npm 包名是可选路径，不是唯一路径**：`dsh-chatgpt-subscription` 在 npm 上可能尚未发布；文档必须同时给出仓库地址，并在故障排查里写明「报未找到相关插件 → 改填仓库地址」。
+- **`package.json` 只允许 `prepublishOnly`**（本仓库不发 npm，它只是有人手动发布时的重建保险）。**禁止加 `prepare` / `prepack` / `postinstall`**：pnpm 对 git 依赖会执行 `prepare` 并在未放行时直接失败（`ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`），会让「填 GitHub 地址」这条主流安装路径变成「待批准的构建脚本」卡点（已实测：带 `prepare` 的清单装 git 地址 exit=1，只留 `prepublishOnly` 则 exit=0 且零构建）。
+- **本仓库不发布 npm 包**（2026-09-24 决定）：`publish-npm.yml` 已删除，不要加回来；三处文档一律引导填**仓库地址**，禁止出现包名安装/更新指引（不带地址的 `dsh plugin … add dsh-chatgpt-subscription`、`@latest` 之类），故障排查要写明「报未找到相关插件 → 改填仓库地址」。`test-install-docs.mjs` 会拦住回退。
 - 改 `src/` 后必须 `npm run build` 并提交 `lib/`（CI 的「Verify generated bundle is committed」会拦住忘记重建的 PR）。
 
 ## 开发流程
@@ -47,4 +46,4 @@
 1. 改 `src/` → `npm run build` 重建 `lib/`（`lib/` 入库，必须一起提交）
 2. `node tests/run-all.mjs` 必须全绿
 3. 提交信息遵循 Conventional Commits
-4. 发布四件套同步：semver → CHANGELOG → commit → tag → Release；标签推到 GitHub 后 `publish-npm.yml` 发布 npm（需要仓库 secret `NPM_TOKEN`，没配则只有 Release、npm 上查不到包）
+4. 发布四件套同步：semver → CHANGELOG → commit → tag → Release；本仓库不发布 npm 包，tag/Release 只作版本记录与安装地址（`…/dsh-chatgpt-subscription`）的刷新节点

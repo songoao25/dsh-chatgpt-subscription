@@ -38,10 +38,9 @@ Open **Plugins → Add plugin** and paste this repository address into the "pack
 https://github.com/SONGOAO25/dsh-chatgpt-subscription
 ```
 
-The package lives at the repository root and `lib/` is committed, so installing by address runs no build step and asks for no build-script approval. The same box also accepts:
+The package lives at the repository root and `lib/` is committed, so installing by address runs no build step and asks for no build-script approval. The same box also accepts an absolute path to a checkout of this repository (for development).
 
-- the package name `dsh-chatgpt-subscription` — installs the released version from npm;
-- an absolute path to a checkout of this repository — for development.
+This plugin is **not published to npm**, so the package name itself does not resolve there: entering `dsh-chatgpt-subscription` in that box reports **no matching plugin**. Always use the repository address above.
 
 This is the way to install in the **desktop app**: DSH manages its `desktop` profile itself and the CLI rejects `dsh plugin --profile desktop`, so the plugin page is the only install path there.
 
@@ -52,12 +51,11 @@ Then **restart DSH** — plugins are composed when the host process starts, so a
 Use the profile you actually boot (`dsh web` boots the `web` profile):
 
 ```bash
-# the released version from npm
-dsh plugin --profile web add dsh-chatgpt-subscription
-
-# or the repository's default branch (no build runs; lib/ is committed)
+# follow the repository's default branch (no build runs; lib/ is committed)
 dsh plugin --profile web add https://github.com/SONGOAO25/dsh-chatgpt-subscription
 ```
+
+There is no package name to add here — this plugin is not published to npm, so a package-name lookup reports **no matching plugin**.
 
 `--profile desktop` is refused by design — that profile belongs to the desktop app. Install through **Plugins → Add plugin** there instead.
 
@@ -71,9 +69,9 @@ cd dsh-chatgpt-subscription
 ./install.sh                # installs to the "web" profile; use --profile <name> to override
 ```
 
-A `link:` install tracks your checkout instead of npm — see [Updating](#updating).
+A `link:` install tracks your checkout rather than the repository's default branch — see [Updating](#updating).
 
-> If the plugin page reports **no matching plugin** or npm answers `404` for the package name, that release has not been published to npm: install by repository address instead.
+> Install with the repository address: this plugin is not on npm, so a package-name lookup reports **no matching plugin** every time.
 
 After installing, open **Plugins → ChatGPT Subscription**. See [docs/INSTALL.md](docs/INSTALL.md) for the full install, update and troubleshooting guide.
 
@@ -91,7 +89,6 @@ After installing, open **Plugins → ChatGPT Subscription**. See [docs/INSTALL.m
 | How you installed | How to update |
 |---|---|
 | Repository address (plugin page or CLI) | run the same address install again, then restart DSH |
-| npm package name | `dsh plugin --profile web add dsh-chatgpt-subscription@latest`, then restart DSH |
 | `link:` — one-command script or a local checkout | `git -C <repo> fetch origin && git -C <repo> merge --ff-only origin/main && node <repo>/scripts/build.mjs`, then restart DSH |
 
 Updating is manual — nothing changes on disk until you run the command. Details: [docs/INSTALL.md](docs/INSTALL.md#更新).
@@ -121,6 +118,9 @@ Open **Plugins → Add plugin** and paste `https://github.com/SONGOAO25/dsh-chat
 
 **Q: The plugin page asks me to approve a build script.**
 The installed manifest declares an install-time script (`prepare` / `prepack`). This repository's manifest keeps only `prepublishOnly`, so installing by the current repository address runs no build and asks for no approval — reinstall from the latest commit's address.
+
+**Q: Is this on npm?**
+No. The plugin is distributed from this repository only — install it by repository address, in the plugin page or with `dsh plugin add`. The `name` in `package.json` is the DSH module name, not a published npm package.
 
 **Q: Do I need a ChatGPT Plus subscription?**
 Yes — the plugin connects your ChatGPT account; chatting with ChatGPT models consumes your subscription quota (models available depend on your plan, e.g. `gpt-5.3-codex-spark` requires a higher plan).

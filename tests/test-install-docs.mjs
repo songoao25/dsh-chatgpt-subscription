@@ -9,7 +9,8 @@
 //      「插件页添加插件」与命令行两条路径，且代码块里不出现 --profile desktop
 //      （desktop profile 由桌面端客户端独占，CLI 会直接拒绝）
 //   4) install.sh / uninstall.sh 对 desktop profile 有明确拒绝与引导，且语法合法
-//   5) publish-npm.yml 存在：打 v*.*.* 标签时校验版本并发布 npm
+//   5) 本仓库不发布 npm：publish-npm.yml 不存在，三处文档都不得给出按包名安装/更新
+//      的命令（包名在 npm 上解析不到，只会报「未找到相关插件」）
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -21,7 +22,7 @@ const read = (relative) => readFileSync(join(root, relative), 'utf8')
 const pkg = JSON.parse(read('package.json'))
 
 // ---------- 1. 安装期脚本：只允许 prepublishOnly ----------
-assert.ok(pkg.scripts.prepublishOnly, 'package.json must keep prepublishOnly so npm publish rebuilds lib/')
+assert.ok(pkg.scripts.prepublishOnly, 'package.json keeps prepublishOnly as the only lifecycle hook (inert unless someone publishes)')
 for (const forbidden of ['prepare', 'prepack', 'postinstall', 'install']) {
   assert.equal(pkg.scripts[forbidden], undefined,
     'package.json must not declare a ' + forbidden + ' script: pnpm runs it for git dependencies, ' +
@@ -92,12 +93,21 @@ assert.notEqual(desktopRun.status, 0, 'install.sh --profile desktop must fail in
 assert.ok(/desktop/.test(desktopRun.stdout + desktopRun.stderr), 'install.sh must name the refused profile')
 assert.ok(/添加插件/.test(desktopRun.stdout + desktopRun.stderr), 'install.sh must send desktop users to the plugin page')
 
-// ---------- 5. npm 发布链 ----------
-const publish = read('.github/workflows/publish-npm.yml')
-assert.ok(/tags:/.test(publish) && /'v\*\.\*\.\*'/.test(publish), 'publish-npm must trigger on v*.*.* tags')
-assert.ok(publish.includes('secrets.NPM_TOKEN'), 'publish-npm must authenticate with the NPM_TOKEN secret')
-assert.ok(publish.includes("require('./package.json').version"), 'publish-npm must compare the tag with the package version')
-assert.ok(publish.includes('npm publish'), 'publish-npm must publish the package')
+// ---------- 5. 不发布 npm：文档不得引导按包名安装 ----------
+assert.ok(!existsSync(join(root, '.github/workflows/publish-npm.yml')),
+  'this repository does not publish to npm — keep .github/workflows/publish-npm.yml deleted')
+for (const [name, text] of Object.entries(docs)) {
+  assert.ok(!/dsh-chatgpt-subscription@latest/.test(text),
+    name + ' must not hand users an npm @latest update command')
+  assert.ok(!/dsh plugin --profile \S+ add dsh-chatgpt-subscription(\s|$)/m.test(text),
+    name + ' must not present a bare package-name install command (the package is not on npm)')
+}
+assert.ok(/不发布|没有发布|not published/.test(docs['docs/INSTALL.md']),
+  'docs/INSTALL.md must state that the plugin is not published to npm')
+assert.ok(/not published to npm/.test(docs['README.md']),
+  'README.md must state that the plugin is not published to npm')
+assert.ok(/不发布 npm/.test(docs['README.zh-CN.md']),
+  'README.zh-CN.md must state that the plugin is not published to npm')
 
 // locale 字典是插件页显示的元信息来源，安装契约测试顺手钉住它没被删
 assert.deepEqual(readdirSync(join(root, 'locale')).sort(), ['en.json', 'zh.json'], 'locale/ must keep the two DSH languages')

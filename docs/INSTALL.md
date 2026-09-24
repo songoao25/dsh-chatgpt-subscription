@@ -18,8 +18,9 @@ https://github.com/SONGOAO25/dsh-chatgpt-subscription
 
 包就在仓库根目录，`lib/` 已入库，所以填地址安装**不跑构建、不会弹「待批准的构建脚本」**，装完即用。同一个框也接受：
 
-- 包名 `dsh-chatgpt-subscription` —— 装 npm 上已发布的版本；
 - 本仓库工作副本的绝对路径 —— 用于开发（会产生 `link:` 安装）。
+
+**本插件不发布 npm 包**：那一栏填包名 `dsh-chatgpt-subscription` 只会报「未找到相关插件」，请始终填上面的仓库地址。
 
 **桌面端客户端只能用这条**：DSH 的 `desktop` profile 由客户端自己管理，命令行 `dsh plugin --profile desktop ...` 会被直接拒绝（`profile "desktop" is managed exclusively by the Electron application`）。
 
@@ -28,12 +29,11 @@ https://github.com/SONGOAO25/dsh-chatgpt-subscription
 用你实际启动的 profile（`dsh web` 启动的是 `web`）：
 
 ```bash
-# npm 上已发布的版本
-dsh plugin --profile web add dsh-chatgpt-subscription
-
-# 或跟随仓库默认分支（不跑构建，lib/ 已入库）
+# 跟随仓库默认分支（不跑构建，lib/ 已入库）
 dsh plugin --profile web add https://github.com/SONGOAO25/dsh-chatgpt-subscription
 ```
+
+命令行同样没有包名可填——本插件不发布 npm 包，填包名只会报「未找到相关插件」。
 
 `desktop` 被保留给桌面端客户端——CLI 会直接拒绝这个 profile，不会替你安装。
 
@@ -59,9 +59,9 @@ cd dsh-chatgpt-subscription
 
 **注意：安装后需要重启 DSH 才会生效**——宿主进程在启动时组合插件。刷新页面不足以加载 host 端。
 
-**为什么 git 地址安装不需要构建**：`lib/` 是入库的构建产物，且 `package.json` 只保留 `prepublishOnly`（只在 `npm publish` 时重建）。
+**为什么 git 地址安装不需要构建**：`lib/` 是入库的构建产物，仓库根就是一个开箱即用的插件包。
 
-pnpm 对 git 依赖会执行包里的 `prepare` 脚本，且默认拦下要求批准（`ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`）；`prepack` 只在 `npm publish` / `npm pack` 时跑。本包两个都不声明，所以填 GitHub 地址是**零构建、零授权**的。
+pnpm 对 git 依赖会执行包里的 `prepare` 脚本，且默认拦下要求批准（`ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`）。本包不声明 `prepare` / `prepack`（`package.json` 里只有 `prepublishOnly`，仅在本仓库自己执行发布时才跑），所以填 GitHub 地址是**零构建、零授权**的。
 
 ### 验证安装成功
 
@@ -87,7 +87,6 @@ dsh --profile web --dump-config | grep dsh-chatgpt-subscription
 | 你的安装方式 | 更新命令 |
 |---|---|
 | 仓库地址（插件页或命令行） | 再执行一次同样的地址安装（插件页重填同一个地址），然后重启 DSH |
-| 包名（npm） | `dsh plugin --profile web add dsh-chatgpt-subscription@latest`，然后重启 DSH |
 | `link:`（一键脚本或本地代码） | 见下方三步 |
 
 `link:` 安装更新时要**三步一起做**：拉代码 → 切到默认分支 → 重新构建：
@@ -102,7 +101,7 @@ node scripts/build.mjs
 - **别只用 `git pull`**：本地开发分支从没推到远端时它会直接失败（`no such ref was fetched`）；而且 `link:` 安装加载的是构建产物 `lib/`，只拉代码不重建，重启后跑的还是旧代码。
 - 三条命令都是 `--ff-only` / 非破坏性的：工作区不干净或分支上有本地提交时，git 会拒绝执行，而不是覆盖你的改动。
 - **更新不会自动发生**：本插件不提供自动更新；磁盘上的一切改动都要等你执行命令之后才发生。
-- 更新 npm 包名安装时若报「未找到相关插件」，说明该版本还没发布到 npm：改填仓库地址安装即可。
+- 本插件不发布 npm 包，所以更新也只能走仓库地址或本地副本这两条路。
 
 ## 卸载
 
@@ -128,7 +127,7 @@ dsh plugin --profile web remove dsh-chatgpt-subscription
 | 现象 | 原因与处理 |
 |---|---|
 | 插件详情里没有配置页 | ① 没重启：需重启 DSH；② 装错 profile：确认启动用的 profile 与安装目标一致；③ `dsh --profile web --dump-config` 里没有 dsh-chatgpt-subscription：重新执行安装 |
-| 插件页报「未找到相关插件」 | npm 上还没有这个包/这个版本：那一栏改填仓库地址 `https://github.com/SONGOAO25/dsh-chatgpt-subscription` |
+| 插件页或命令行报「未找到相关插件」 | 输入的是包名。本插件不发布 npm 包，请改填仓库地址 `https://github.com/SONGOAO25/dsh-chatgpt-subscription` |
 | 插件页报「这个包没有声明组合包」 | 装到的是一个「仓库根不是包」的仓库。本仓库根目录一直是包；请确认填的是本仓库，并用包含最新提交的地址 |
 | 插件页提示「有依赖的安装脚本需要你允许」/「待批准的构建脚本」 | 装到的清单里声明了 `prepare` / `prepack`（本仓库当前清单没有，只有 `prepublishOnly`）。用最新提交的仓库地址重装；确实需要放行时，按提示把 pnpm 打印的那一行加进 profile 的 `pnpm-workspace.yaml` 的 `allowBuilds` 再重试 |
 | 命令行报 `profile "desktop" is managed exclusively by the Electron application` | 桌面端客户端的 profile 不能用 CLI 改：请在客户端 **插件 → 添加插件** 里安装/卸载 |
