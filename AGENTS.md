@@ -53,6 +53,9 @@
 - **auto-merge 的合并不会触发 push 事件**：仓库自带的 auto-merge 用 `GITHUB_TOKEN` 推送，GitHub 有意不让它触发其他 workflow。于是合并到 main 后 **Release Please / CI 都不会自动跑**，发布 PR 会停在旧状态。补跑方式：
   ```bash
   gh workflow run release-please.yml            # 刷新发布 PR（含最新 commit 与 CHANGELOG）
-  gh workflow run CI --ref <发布分支名>          # 给发布分支补上必需的 CI 检查
   ```
-- **发布 PR 的 CI 检查**：release-please 的分支由 `GITHUB_TOKEN` 推送，收不到 `pull_request` 事件，因此默认没有任何检查，会被分支保护的必需检查 `CI` 卡住。合并前用上面的 `gh workflow run CI --ref …` 补一次即可。
+- **发布 PR 的必需检查 `CI` 不能用 workflow_dispatch 顶替**（2026-09-24 实测）：release-please 用 `GITHUB_TOKEN` 推分支，它触发的 `pull_request` 运行会停在 `action_required`（同仓 bot 分支的 approve API 返回 404，批不了）。`gh workflow run CI --ref <发布分支>` **确实能把 CI 跑绿**，但那次运行不挂在 PR 上，PR 依旧 `BLOCKED`（`gh pr checks` 显示 no checks）。可靠做法是让 owner 重新触发 `pull_request`：
+  ```bash
+  gh pr close <发布PR> && gh pr reopen <发布PR>   # 以 owner 身份重跑 CI/CodeQL，PR 转 CLEAN
+  ```
+  刷新（上一条）之后分支被 bot 重新推送，需要再执行一次 close/reopen。
