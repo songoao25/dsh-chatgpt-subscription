@@ -38,6 +38,13 @@
   ```
 - 开发约定：修改 `src/` 后重新构建；测试必须全绿再提交；零密钥、零个人路径。
 
+## 发布是自动的（不用手改版本号）
+
+- 合并到 main 后，Release Please 会按 Conventional Commits 自动开/更新发布 PR（版本号、CHANGELOG、tag、GitHub Release 都由它生成）；
+- 发布 PR 也会自动合并，所以**不要手改** `package.json` 的 `version`、`CHANGELOG.md`、`package-lock.json` 的版本字段；
+- 本插件**不发布 npm 包**：tag / Release 只作版本记录，用户装插件用的是仓库地址或本地副本（见 [docs/INSTALL.md](docs/INSTALL.md)）；
+- 仓库 secret `AUTOMATION_TOKEN` 是这条链的燃料（GitHub 自带的 `GITHUB_TOKEN` 无法触发后续 workflow），细节与手动兜底见 [AGENTS.md](AGENTS.md)。
+
 ## 安全
 
 发现安全漏洞请**不要公开提交 Issue**——请通过 GitHub **Private security advisory** 私下报告（仓库主页 → Security → Report a vulnerability），详见 [SECURITY.md](SECURITY.md)。
