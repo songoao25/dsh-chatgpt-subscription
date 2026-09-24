@@ -38,6 +38,7 @@ function extractModule(nameList, depOverrides) {
   const wantedConstants = new Set([
     'CODEX_OAUTH_CLIENT_ID', 'OAUTH_CALLBACK_PATH', 'CODEX_JWT_ACCOUNT_CLAIM',
     'OAUTH_SCOPE', 'CODEX_TOKEN_FALLBACK_LIFETIME_SEC', 'CODEX_REFRESH_AHEAD_SEC',
+    'DESKTOP_APP_ORIGIN',
   ])
   const wantedFns = new Set(nameList)
   const lines = src.split('\n')
@@ -332,6 +333,7 @@ function makeJwt(claims) {
   check('host 不再残留旧的空槽即放行判定', src.includes('canClaimCodexCredential('), false)
   check('host 失效状态清理 Codex 凭据', (src.match(/clearInjectedCodexCredential\(flag\)/g) || []).length >= 4, true)
   check('OAuth 启动 RPC 受同源保护', src.includes('MUTATING = { startCodexOAuth: true'), true)
+  check('桌面端同源仅放行固定 dsh-app origin', src.includes("DESKTOP_APP_ORIGIN = 'dsh-app://app'") && src.includes('if (origin === DESKTOP_APP_ORIGIN) return true;') && !src.includes("origin.startsWith('dsh-app')"), true)
   check('ChatGPT 默认模型使用明确配置', src.includes('CODEX_DEFAULT_MODEL'), true)
   check('客户端 RPC 检查 HTTP 状态', clientSrc.includes("if (!r.ok) throw new Error"), true)
   check('客户端对 OAuth 启动和解绑使用 POST', clientSrc.includes("MUTATING_RPC = { startCodexOAuth: true, unbindCodex: true }") && clientSrc.includes("method: mutating ? 'POST' : 'GET'"), true)
