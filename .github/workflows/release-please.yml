@@ -2,6 +2,9 @@ name: Release Please
 on:
   push:
     branches: [main]
+  # 手动补跑：auto-merge 用 GITHUB_TOKEN 推送的合并不会触发 push 事件，
+  # 发布 PR 会因此停在旧状态（2026-09-24 的 #20/#21 就是这样漏掉的）。
+  workflow_dispatch:
 permissions:
   contents: write
   pull-requests: write
