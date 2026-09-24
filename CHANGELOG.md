@@ -2,6 +2,13 @@
 
 本项目的版本记录遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.3.2](https://github.com/songoao25/dsh-chatgpt-subscription/compare/v0.3.1...v0.3.2) (2026-09-24)
+
+
+### Bug Fixes
+
+* allow desktop OAuth origin ([#28](https://github.com/songoao25/dsh-chatgpt-subscription/issues/28)) ([247978d](https://github.com/songoao25/dsh-chatgpt-subscription/commit/247978debc58869a35fc4efbed5dc2849f082f5a))
+
 ## [0.3.1](https://github.com/songoao25/dsh-chatgpt-subscription/compare/v0.3.0...v0.3.1) (2026-09-24)
 
 
