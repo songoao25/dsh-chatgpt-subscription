@@ -1,4 +1,4 @@
-// dsh-chatgpt-subscription — host half（静态 bundle 形态）
+// dsh-chatgpt-sub — host half（静态 bundle 形态）
 // 业务：ChatGPT 订阅官方 OAuth 绑定 + 令牌看护 + openai-codex 路由注册
 // 独立插件：绑定/令牌管理；dsh-bottom-info-bar 只读令牌显示额度
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
@@ -7,7 +7,15 @@ import { dirname, join } from 'node:path'
 import { createHash, randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
 
-const DATA_DIR = process.env.DSH_CHATGPT_DATA_DIR || join(homedir(), '.dsh', 'dsh-chatgpt-subscription')
+const DATA_DIR = process.env.DSH_CHATGPT_DATA_DIR || join(homedir(), '.dsh', 'dsh-chatgpt-sub')
+// 一次性迁移：0.3.x 时包名是 dsh-chatgpt-subscription，绑定标记目录随包名升级。
+// 默认路径下旧目录存在、新目录不存在时整体搬移（绑定标记跟着走，用户不用重新绑定）；
+// 显式指定 DSH_CHATGPT_DATA_DIR 的是开发/测试隔离场景，一律不动。
+// 搬移失败就落在新目录从头开始：auth.json 里的令牌不受影响，代价只是重新绑定一次。
+const LEGACY_DATA_DIR = join(homedir(), '.dsh', 'dsh-chatgpt-subscription')
+if (!process.env.DSH_CHATGPT_DATA_DIR && existsSync(LEGACY_DATA_DIR) && !existsSync(DATA_DIR)) {
+  try { renameSync(LEGACY_DATA_DIR, DATA_DIR); } catch { }
+}
 const CODEX_BIND_FILE = process.env.DSH_CHATGPT_BIND_FILE || join(DATA_DIR, 'codex-bind.json')
 
 const CODEX_OAUTH_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann' // OpenAI OAuth 公开 client_id（token 续期用，非密钥）
@@ -931,7 +939,7 @@ export default {
     }
 
     // ---------- RPC 路由（webServer HTTP，JSON 进出，使用宿主认证边界） ----------
-    const ROUTE_PREFIX = '/_dsh/dsh-chatgpt-subscription';
+    const ROUTE_PREFIX = '/_dsh/dsh-chatgpt-sub';
     const ROUTES = {
       getCodexBridgeStatus: function () { return getCodexBridgeStatusRpc(); },
       startCodexOAuth: function () { return startCodexOAuthRpc(); },
@@ -996,10 +1004,10 @@ export default {
           });
           return function () { dispose(); };
         } catch (err) {
-          console.warn('[dsh-chatgpt-subscription] webServer 路由注册失败', String((err && err.message) || err));
+          console.warn('[dsh-chatgpt-sub] webServer 路由注册失败', String((err && err.message) || err));
         }
-      }, 'dsh-chatgpt-subscription: Web routes');
-    }, 'dsh-chatgpt-subscription: Web routes');
+      }, 'dsh-chatgpt-sub: Web routes');
+    }, 'dsh-chatgpt-sub: Web routes');
 
     // ---------- 启动即刷 + 30min 令牌看护 ----------
     // 只有绑定标记存在时，syncCodexToken 才注册 ChatGPT 路由；未绑定状态绝不触碰用户配置。

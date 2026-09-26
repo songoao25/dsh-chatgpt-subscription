@@ -1,4 +1,4 @@
-// dsh-chatgpt-subscription — 全量测试入口
+// dsh-chatgpt-sub — 全量测试入口
 // 用法：node tests/run-all.mjs（或 npm test）
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'

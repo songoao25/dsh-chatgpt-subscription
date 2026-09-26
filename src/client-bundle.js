@@ -1,8 +1,8 @@
-// dsh-chatgpt-subscription — client half：插件详情页的订阅配置
+// dsh-chatgpt-sub — client half：插件详情页的订阅配置
 // 文案全部收在下面这份 zh / en 字典里，注册进 DSH 的 locale 服务后跟随界面语言。
 // 铁律：取文案绝不能让渲染抛错——配置页整块消失过一次，根因就是未在 inject 里声明 locale 就访问
 // ctx.locale（cordis 对未声明的服务属性直接抛 cannot get property "locale" without inject）。
-const LOCALE_NAMESPACE = 'dsh-chatgpt-subscription';
+const LOCALE_NAMESPACE = 'dsh-chatgpt-sub';
 const LOCALES = {
   zh: {
     'meta.title': 'ChatGPT 订阅',
@@ -140,12 +140,12 @@ module.exports = {
       slots = ctx.slots || ctx.get('slots');
     }
     if (slots === undefined) {
-      console.warn('[dsh-chatgpt-subscription] slots 服务未就绪，插件配置页未注册');
+      console.warn('[dsh-chatgpt-sub] slots 服务未就绪，插件配置页未注册');
       return;
     }
 
     // RPC 封装（webServer HTTP）
-    const PREFIX = '/_dsh/dsh-chatgpt-subscription';
+    const PREFIX = '/_dsh/dsh-chatgpt-sub';
     // DSH 0.1.7 desktop host enforces POST for state-changing RPCs, even
     // when the call has no JSON arguments. Keep read-only status polling GET.
     const MUTATING_RPC = { startCodexOAuth: true, unbindCodex: true };
@@ -207,7 +207,7 @@ module.exports = {
     if (localeService && typeof localeService.register === 'function') {
       try {
         var disposeDictionaries = localeService.register(LOCALE_NAMESPACE, LOCALES);
-        if (typeof ctx.effect === 'function') ctx.effect(function () { return disposeDictionaries; }, 'dsh-chatgpt-subscription: dictionaries');
+        if (typeof ctx.effect === 'function') ctx.effect(function () { return disposeDictionaries; }, 'dsh-chatgpt-sub: dictionaries');
       } catch (err) { /* 注册失败：退回浏览器语言 */ }
     }
     var boundTranslate = localeService && typeof localeService.bind === 'function' ? localeService.bind(LOCALE_NAMESPACE) : null;
@@ -267,10 +267,10 @@ module.exports = {
     // 行本身用 padding:12px 2px（宿主 .X_2TxG_row 的真实值），内容内缩 2px，与宿主一致。
     // 全部走 --dsw-alias-* 令牌，深色/浅色主题自动跟随。
     function installStyles() {
-      var id = 'dsh-chatgpt-subscription-page';
+      var id = 'dsh-chatgpt-sub-page';
       if (document.querySelector('style[data-plugin-css="' + id + '"]') !== null) return;
       var style = document.createElement('style');
-      style.dataset.plugin = 'dsh-chatgpt-subscription';
+      style.dataset.plugin = 'dsh-chatgpt-sub';
       style.dataset.pluginCss = id;
       style.textContent = `
         /* 宽度上限交给宿主：.X_2TxG_page > * 已把内容钉在 min(100%, 960px)，这里再写死 760px 会在宽视口下压窄内容、右侧控件够不到宿主右边界。 */
@@ -511,7 +511,7 @@ module.exports = {
       return slots.register(
         {
           name: 'plugins.bundle.config',
-          key: 'dsh-chatgpt-subscription',
+          key: 'dsh-chatgpt-sub',
           label: function () { return t('meta.title'); },
         },
         SubscriptionBundleConfig

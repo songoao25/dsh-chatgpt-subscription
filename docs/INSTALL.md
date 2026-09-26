@@ -10,17 +10,19 @@
 
 ### 方式一：在 DSH 插件页添加（推荐；桌面端唯一方式）
 
-打开 DSH 的 **插件 → 添加插件**，在「包名或地址」里填：
+打开 DSH 的 **插件 → 添加插件**，在「包名或地址」里填包名（推荐）或仓库地址，二选一：
 
 ```
-https://github.com/SONGOAO25/dsh-chatgpt-subscription
+dsh-chatgpt-sub
 ```
 
-包就在仓库根目录，`lib/` 已入库，所以填地址安装**不跑构建、不会弹「待批准的构建脚本」**，装完即用。同一个框也接受：
+```
+https://github.com/SONGOAO25/dsh-chatgpt-sub
+```
+
+填包名安装 npm 上的**发布版本**；填仓库地址安装仓库根（`lib/` 已入库，所以填地址安装**不跑构建、不会弹「待批准的构建脚本」**）。同一个框也接受：
 
 - 本仓库工作副本的绝对路径 —— 用于开发（会产生 `link:` 安装）。
-
-**本插件不发布 npm 包**：那一栏填包名 `dsh-chatgpt-subscription` 只会报「未找到相关插件」，请始终填上面的仓库地址。
 
 **桌面端客户端只能用这条**：DSH 的 `desktop` profile 由客户端自己管理，命令行 `dsh plugin --profile desktop ...` 会被直接拒绝（`profile "desktop" is managed exclusively by the Electron application`）。
 
@@ -29,19 +31,20 @@ https://github.com/SONGOAO25/dsh-chatgpt-subscription
 用你实际启动的 profile（`dsh web` 启动的是 `web`）：
 
 ```bash
-# 跟随仓库默认分支（不跑构建，lib/ 已入库）
-dsh plugin --profile web add https://github.com/SONGOAO25/dsh-chatgpt-subscription
-```
+# npm 发布版本（推荐）
+dsh plugin --profile web add dsh-chatgpt-sub
 
-命令行同样没有包名可填——本插件不发布 npm 包，填包名只会报「未找到相关插件」。
+# 或仓库默认分支（不跑构建，lib/ 已入库）
+dsh plugin --profile web add https://github.com/SONGOAO25/dsh-chatgpt-sub
+```
 
 `desktop` 被保留给桌面端客户端——CLI 会直接拒绝这个 profile，不会替你安装。
 
 ### 方式三：一键脚本（产生 `link:` 安装）
 
 ```bash
-git clone https://github.com/SONGOAO25/dsh-chatgpt-subscription.git
-cd dsh-chatgpt-subscription
+git clone https://github.com/SONGOAO25/dsh-chatgpt-sub.git
+cd dsh-chatgpt-sub
 ./install.sh
 # 默认安装到 web profile；其他 profile：
 ./install.sh --profile <profile名>
@@ -66,8 +69,8 @@ pnpm 对 git 依赖会执行包里的 `prepare` 脚本，且默认拦下要求�
 ### 验证安装成功
 
 ```bash
-dsh --profile web --dump-config | grep dsh-chatgpt-subscription
-# 应看到 dsh-chatgpt-subscription 行（bundle 层已生效）
+dsh --profile web --dump-config | grep dsh-chatgpt-sub
+# 应看到 dsh-chatgpt-sub 行（bundle 层已生效）
 ```
 
 重启后，在 DSH **插件** 页能看到 **ChatGPT 订阅** 即安装成功。（桌面端客户端没有可用的 `dsh --profile` 命令，直接在插件页确认即可。）
@@ -86,13 +89,14 @@ dsh --profile web --dump-config | grep dsh-chatgpt-subscription
 
 | 你的安装方式 | 更新命令 |
 |---|---|
-| 仓库地址（插件页或命令行） | 再执行一次同样的地址安装（插件页重填同一个地址），然后重启 DSH |
+| 包名 `dsh-chatgpt-sub`（插件页或命令行） | 再执行一次同样的安装（自动取 npm 最新发布版本），然后重启 DSH |
+| 仓库地址（插件页或命令行） | 再执行一次同样的地址安装（取仓库默认分支最新提交），然后重启 DSH |
 | `link:`（一键脚本或本地代码） | 见下方三步 |
 
 `link:` 安装更新时要**三步一起做**：拉代码 → 切到默认分支 → 重新构建：
 
 ```bash
-cd dsh-chatgpt-subscription
+cd dsh-chatgpt-sub
 git fetch origin && git checkout main && git merge --ff-only origin/main
 node scripts/build.mjs
 # 重启 DSH
@@ -101,17 +105,16 @@ node scripts/build.mjs
 - **别只用 `git pull`**：本地开发分支从没推到远端时它会直接失败（`no such ref was fetched`）；而且 `link:` 安装加载的是构建产物 `lib/`，只拉代码不重建，重启后跑的还是旧代码。
 - 三条命令都是 `--ff-only` / 非破坏性的：工作区不干净或分支上有本地提交时，git 会拒绝执行，而不是覆盖你的改动。
 - **更新不会自动发生**：本插件不提供自动更新；磁盘上的一切改动都要等你执行命令之后才发生。
-- 本插件不发布 npm 包，所以更新也只能走仓库地址或本地副本这两条路。
 
 ## 卸载
 
 桌面端客户端：在 **插件** 页里卸载。命令行：
 
 ```bash
-cd dsh-chatgpt-subscription
+cd dsh-chatgpt-sub
 ./uninstall.sh
 # 或手动：
-dsh plugin --profile web remove dsh-chatgpt-subscription
+dsh plugin --profile web remove dsh-chatgpt-sub
 ```
 
 卸载会清理：profile 插件条目、`llm-pi-ai.providers.openai-codex` 路由配置、`OPENAI_CODEX_API_KEY` 凭据、绑定标记目录。**保留** `~/.codex/auth.json`（codex CLI 自己的登录态）。重启后模型切换器的 ChatGPT 提供商自动消失。
@@ -126,8 +129,8 @@ dsh plugin --profile web remove dsh-chatgpt-subscription
 
 | 现象 | 原因与处理 |
 |---|---|
-| 插件详情里没有配置页 | ① 没重启：需重启 DSH；② 装错 profile：确认启动用的 profile 与安装目标一致；③ `dsh --profile web --dump-config` 里没有 dsh-chatgpt-subscription：重新执行安装 |
-| 插件页或命令行报「未找到相关插件」 | 输入的是包名。本插件不发布 npm 包，请改填仓库地址 `https://github.com/SONGOAO25/dsh-chatgpt-subscription` |
+| 插件详情里没有配置页 | ① 没重启：需重启 DSH；② 装错 profile：确认启动用的 profile 与安装目标一致；③ `dsh --profile web --dump-config` 里没有 dsh-chatgpt-sub：重新执行安装 |
+| 插件页或命令行报「未找到相关插件」 | 包名拼错了。发布版本的正确包名是 `dsh-chatgpt-sub`；或者改用仓库地址安装 |
 | 插件页报「这个包没有声明组合包」 | 装到的是一个「仓库根不是包」的仓库。本仓库根目录一直是包；请确认填的是本仓库，并用包含最新提交的地址 |
 | 插件页提示「有依赖的安装脚本需要你允许」/「待批准的构建脚本」 | 装到的清单里声明了 `prepare` / `prepack`（本仓库当前清单没有，只有 `prepublishOnly`）。用最新提交的仓库地址重装；确实需要放行时，按提示把 pnpm 打印的那一行加进 profile 的 `pnpm-workspace.yaml` 的 `allowBuilds` 再重试 |
 | 命令行报 `profile "desktop" is managed exclusively by the Electron application` | 桌面端客户端的 profile 不能用 CLI 改：请在客户端 **插件 → 添加插件** 里安装/卸载 |

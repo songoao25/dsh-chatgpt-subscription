@@ -1,4 +1,4 @@
-// dsh-chatgpt-subscription — 文案双语契约 + 配置页渲染回归
+// dsh-chatgpt-sub — 文案双语契约 + 配置页渲染回归
 // 覆盖：
 //   1) locale/{en,zh}.json（插件列表卡片的 meta）与 package.json 接线
 //   2) client half 的 zh/en 字典：键完全对称、中英都齐全、无 AI 腔
@@ -105,7 +105,7 @@ const sandbox = {
 sandbox.window.__ModuleLoader__ = { load: (mod) => { sandbox.loaded = mod } }
 vm.createContext(sandbox)
 vm.runInContext(artifact, sandbox)
-assert.equal(sandbox.loaded.id, 'dsh-chatgpt-subscription', 'client module id must stay the bundle name')
+assert.equal(sandbox.loaded.id, 'dsh-chatgpt-sub', 'client module id must stay the bundle name')
 
 const statusBox = { value: null, index: 0 }
 const React = {

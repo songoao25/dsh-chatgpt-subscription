@@ -2,12 +2,12 @@
 
 **English** | [**中文**](README.zh-CN.md)
 
-[![License: MIT](https://img.shields.io/github/license/SONGOAO25/dsh-chatgpt-subscription)](https://github.com/SONGOAO25/dsh-chatgpt-subscription/blob/main/LICENSE)
-[![Release](https://img.shields.io/github/v/release/SONGOAO25/dsh-chatgpt-subscription)](https://github.com/SONGOAO25/dsh-chatgpt-subscription/releases)
-[![CI](https://img.shields.io/github/actions/workflow/status/SONGOAO25/dsh-chatgpt-subscription/ci.yml)](https://github.com/SONGOAO25/dsh-chatgpt-subscription/actions)
-[![Last Commit](https://img.shields.io/github/last-commit/SONGOAO25/dsh-chatgpt-subscription)](https://github.com/SONGOAO25/dsh-chatgpt-subscription)
-[![Stars](https://img.shields.io/github/stars/SONGOAO25/dsh-chatgpt-subscription)](https://github.com/SONGOAO25/dsh-chatgpt-subscription)
-[![Dependabot](https://img.shields.io/badge/dependabot-enabled-025e8c?logo=dependabot)](https://github.com/SONGOAO25/dsh-chatgpt-subscription/security/dependabot)
+[![License: MIT](https://img.shields.io/github/license/SONGOAO25/dsh-chatgpt-sub)](https://github.com/SONGOAO25/dsh-chatgpt-sub/blob/main/LICENSE)
+[![Release](https://img.shields.io/github/v/release/SONGOAO25/dsh-chatgpt-sub)](https://github.com/SONGOAO25/dsh-chatgpt-sub/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/SONGOAO25/dsh-chatgpt-sub/ci.yml)](https://github.com/SONGOAO25/dsh-chatgpt-sub/actions)
+[![Last Commit](https://img.shields.io/github/last-commit/SONGOAO25/dsh-chatgpt-sub)](https://github.com/SONGOAO25/dsh-chatgpt-sub)
+[![Stars](https://img.shields.io/github/stars/SONGOAO25/dsh-chatgpt-sub)](https://github.com/SONGOAO25/dsh-chatgpt-sub)
+[![Dependabot](https://img.shields.io/badge/dependabot-enabled-025e8c?logo=dependabot)](https://github.com/SONGOAO25/dsh-chatgpt-sub/security/dependabot)
 
 A [DeepSeek Harness](https://github.com/deepseek-ai) plugin: sign in with your ChatGPT account through OpenAI's official OAuth flow, then use ChatGPT models inside DSH. Model calls use your ChatGPT Plus / Pro subscription quota.
 
@@ -32,15 +32,17 @@ A [DeepSeek Harness](https://github.com/deepseek-ai) plugin: sign in with your C
 
 ### Option 1 — Install inside DSH: **Plugins → Add plugin** (works in the desktop app)
 
-Open **Plugins → Add plugin** and paste this repository address into the "package name or address" box:
+Open **Plugins → Add plugin** and enter either the package name (recommended) or the repository address in the "package name or address" box:
 
 ```
-https://github.com/SONGOAO25/dsh-chatgpt-subscription
+dsh-chatgpt-sub
 ```
 
-The package lives at the repository root and `lib/` is committed, so installing by address runs no build step and asks for no build-script approval. The same box also accepts an absolute path to a checkout of this repository (for development).
+```
+https://github.com/SONGOAO25/dsh-chatgpt-sub
+```
 
-This plugin is **not published to npm**, so the package name itself does not resolve there: entering `dsh-chatgpt-subscription` in that box reports **no matching plugin**. Always use the repository address above.
+The package name installs the published version from npm; the repository address installs from the repository root — `lib/` is committed, so no build step runs and no build-script approval is asked. The same box also accepts an absolute path to a checkout of this repository (for development).
 
 This is the way to install in the **desktop app**: DSH manages its `desktop` profile itself and the CLI rejects `dsh plugin --profile desktop`, so the plugin page is the only install path there.
 
@@ -51,11 +53,12 @@ Then **restart DSH** — plugins are composed when the host process starts, so a
 Use the profile you actually boot (`dsh web` boots the `web` profile):
 
 ```bash
-# follow the repository's default branch (no build runs; lib/ is committed)
-dsh plugin --profile web add https://github.com/SONGOAO25/dsh-chatgpt-subscription
-```
+# npm release (recommended)
+dsh plugin --profile web add dsh-chatgpt-sub
 
-There is no package name to add here — this plugin is not published to npm, so a package-name lookup reports **no matching plugin**.
+# or the repository's default branch (no build runs; lib/ is committed)
+dsh plugin --profile web add https://github.com/SONGOAO25/dsh-chatgpt-sub
+```
 
 `--profile desktop` is refused by design — that profile belongs to the desktop app. Install through **Plugins → Add plugin** there instead.
 
@@ -64,14 +67,14 @@ There is no package name to add here — this plugin is not published to npm, so
 For development, or to run unreleased code:
 
 ```bash
-git clone https://github.com/SONGOAO25/dsh-chatgpt-subscription.git
-cd dsh-chatgpt-subscription
+git clone https://github.com/SONGOAO25/dsh-chatgpt-sub.git
+cd dsh-chatgpt-sub
 ./install.sh                # installs to the "web" profile; use --profile <name> to override
 ```
 
-A `link:` install tracks your checkout rather than the repository's default branch — see [Updating](#updating).
+A `link:` install tracks your checkout rather than npm / the repository's default branch — see [Updating](#updating).
 
-> Install with the repository address: this plugin is not on npm, so a package-name lookup reports **no matching plugin** every time.
+> Installed from the old address `https://github.com/SONGOAO25/dsh-chatgpt-subscription`? Nothing to do: GitHub redirects it to the renamed repository. To standardize on the new package name, just install by package name once — the binding data migrates automatically, no sign-in needed.
 
 After installing, open **Plugins → ChatGPT Subscription**. See [docs/INSTALL.md](docs/INSTALL.md) for the full install, update and troubleshooting guide.
 
@@ -88,7 +91,8 @@ After installing, open **Plugins → ChatGPT Subscription**. See [docs/INSTALL.m
 
 | How you installed | How to update |
 |---|---|
-| Repository address (plugin page or CLI) | run the same address install again, then restart DSH |
+| Package name `dsh-chatgpt-sub` (plugin page or CLI) | run the same install again — it picks up the latest npm release — then restart DSH |
+| Repository address (plugin page or CLI) | run the same address install again — it picks up the repository's default branch — then restart DSH |
 | `link:` — one-command script or a local checkout | `git -C <repo> fetch origin && git -C <repo> merge --ff-only origin/main && node <repo>/scripts/build.mjs`, then restart DSH |
 
 Updating is manual — nothing changes on disk until you run the command. Details: [docs/INSTALL.md](docs/INSTALL.md#更新).
@@ -105,7 +109,7 @@ Updating is manual — nothing changes on disk until you run the command. Detail
 In the desktop app, remove the plugin from **Plugins**. On the CLI:
 
 ```bash
-cd dsh-chatgpt-subscription
+cd dsh-chatgpt-sub
 ./uninstall.sh              # removes the plugin and the injected route/credential
 ```
 
@@ -114,13 +118,16 @@ Uninstall keeps `~/.codex/auth.json` (your Codex CLI login) and only cleans what
 ## FAQ
 
 **Q: How do I install this on the desktop app?**
-Open **Plugins → Add plugin** and paste `https://github.com/SONGOAO25/dsh-chatgpt-subscription`. The desktop app manages its own `desktop` profile, so `dsh plugin --profile desktop` is refused — the plugin page is the way in.
+Open **Plugins → Add plugin** and enter the package name `dsh-chatgpt-sub` or the repository address. The desktop app manages its own `desktop` profile, so `dsh plugin --profile desktop` is refused — the plugin page is the way in.
+
+**Q: I installed it under the old name. Anything to do?**
+No. The old address `https://github.com/SONGOAO25/dsh-chatgpt-subscription` redirects to the renamed repository, and existing installs keep updating. To standardize on the new package name `dsh-chatgpt-sub`, install by package name once; the binding data lives on this machine and migrates automatically — no sign-in needed.
 
 **Q: The plugin page asks me to approve a build script.**
-The installed manifest declares an install-time script (`prepare` / `prepack`). This repository's manifest keeps only `prepublishOnly`, so installing by the current repository address runs no build and asks for no approval — reinstall from the latest commit's address.
+The installed manifest declares an install-time script (`prepare` / `prepack`). This repository's manifest keeps only `prepublishOnly`, so installing by package name or by the repository address runs no build and asks for no approval.
 
 **Q: Is this on npm?**
-No. The plugin is distributed from this repository only — install it by repository address, in the plugin page or with `dsh plugin add`. The `name` in `package.json` is the DSH module name, not a published npm package.
+Yes — the package name is `dsh-chatgpt-sub`, matching the repository name. Both the plugin page and `dsh plugin add` accept the package name or the repository address.
 
 **Q: Do I need a ChatGPT Plus subscription?**
 Yes — the plugin connects your ChatGPT account; chatting with ChatGPT models consumes your subscription quota (models available depend on your plan, e.g. `gpt-5.3-codex-spark` requires a higher plan).

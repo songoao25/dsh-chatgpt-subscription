@@ -25,7 +25,7 @@ assert.notEqual(patchRow[1], patchRow[2], 'the row id must differ from the modul
 assert.match(source, /inject:\s*\['slots',\s*'locale'\]/, 'client must declare the slots and locale services it reads')
 assert.doesNotMatch(source, /slots\.inject\('settings\.section'/, 'global settings section must not be registered')
 assert.match(source, /slots\.inject\('plugins\.bundle\.config'/, 'plugin configuration slot must remain registered')
-assert.match(source, /key:\s*'dsh-chatgpt-subscription'/, 'plugin configuration key must match bundle name')
+assert.match(source, /key:\s*'dsh-chatgpt-sub'/, 'plugin configuration key must match bundle name')
 assert.match(source, /require\('react'\)/, 'React must stay an external client module')
 assert.match(artifact, /window\.__ModuleLoader__\.load/, 'built client must use the DSH module loader')
 assert.match(artifact, /require\('react'\)/, 'built client must retain external React loading')

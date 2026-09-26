@@ -1,5 +1,5 @@
 {
-  "name": "dsh-chatgpt-subscription",
+  "name": "dsh-chatgpt-sub",
   "version": "0.3.3",
   "description": "Sign in with your ChatGPT account to use ChatGPT models in DSH.",
   "keywords": [
@@ -13,9 +13,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/SONGOAO25/dsh-chatgpt-subscription.git"
+    "url": "https://github.com/SONGOAO25/dsh-chatgpt-sub.git"
   },
-  "homepage": "https://github.com/SONGOAO25/dsh-chatgpt-subscription",
+  "homepage": "https://github.com/SONGOAO25/dsh-chatgpt-sub",
   "author": "SONGOAO25",
   "license": "MIT",
   "type": "module",
