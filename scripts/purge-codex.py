@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-dsh-chatgpt-subscription — 卸载清理（由 uninstall.sh 调用）
+dsh-chatgpt-sub — 卸载清理（由 uninstall.sh 调用）
 
 安全移除（目标以外的内容逐字节保留）：
   1) ~/.dsh/settings.yaml 中的 llm-pi-ai.providers.openai-codex 段（空父段自动级联清除）
@@ -155,7 +155,7 @@ def purge_credentials(path):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="dsh-chatgpt-subscription 卸载清理：移除 openai-codex 配置与凭据")
+    ap = argparse.ArgumentParser(description="dsh-chatgpt-sub 卸载清理：移除 openai-codex 配置与凭据")
     ap.add_argument("--settings", default=os.path.expanduser("~/.dsh/settings.yaml"),
                     help="settings.yaml 路径（默认 ~/.dsh/settings.yaml）")
     ap.add_argument("--credentials", default=os.path.expanduser("~/.dsh/.credentials.yaml"),

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dsh-chatgpt-subscription — 一键卸载脚本
+# dsh-chatgpt-sub — 一键卸载脚本
 # 用法：./uninstall.sh [--profile <name>]
 # 清理范围（本插件添加的内容）：profile 里的插件条目 + openai-codex 路由配置 +
 # OPENAI_CODEX_API_KEY 凭据 + 绑定标记目录。
@@ -24,10 +24,15 @@ esac
 
 if [[ "$IS_DESKTOP" == "1" ]]; then
   echo "==> profile 'desktop' 由桌面端客户端自己管理，跳过命令行插件移除。"
-  echo "    请在客户端内「插件」页卸载 dsh-chatgpt-subscription；下面继续清理本插件的配置与凭据。"
+  echo "    请在客户端内「插件」页卸载 dsh-chatgpt-sub；下面继续清理本插件的配置与凭据。"
 else
-  echo "==> 从 profile '$PROFILE' 卸载 dsh-chatgpt-subscription"
-  if ! dsh plugin --profile "$PROFILE" remove dsh-chatgpt-subscription; then
+  echo "==> 从 profile '$PROFILE' 卸载 dsh-chatgpt-sub"
+  # 兼容两次包名：dsh-chatgpt-sub（现名）与 dsh-chatgpt-subscription（0.3.x 旧名）
+  REMOVED=0
+  for PKG in dsh-chatgpt-sub dsh-chatgpt-subscription; do
+    if dsh plugin --profile "$PROFILE" remove "$PKG"; then REMOVED=1; fi
+  done
+  if [[ "$REMOVED" != "1" ]]; then
     echo "  ⚠ 插件移除失败（可能已卸载或 profile 不存在），继续清理配置。"
   fi
 fi
@@ -43,9 +48,10 @@ else
   echo "  2) 删除 ~/.dsh/.credentials.yaml 中的 OPENAI_CODEX_API_KEY 行"
 fi
 
-echo "==> 清理绑定标记目录（~/.dsh/dsh-chatgpt-subscription/）"
-DATA_DIR="${DSH_CHATGPT_DATA_DIR:-$HOME/.dsh/dsh-chatgpt-subscription}"
-DEFAULT_DATA_DIR="$HOME/.dsh/dsh-chatgpt-subscription"
+echo "==> 清理绑定标记目录（~/.dsh/dsh-chatgpt-sub/，以及旧版 ~/.dsh/dsh-chatgpt-subscription/）"
+DATA_DIR="${DSH_CHATGPT_DATA_DIR:-$HOME/.dsh/dsh-chatgpt-sub}"
+DEFAULT_DATA_DIR="$HOME/.dsh/dsh-chatgpt-sub"
+LEGACY_DATA_DIR="$HOME/.dsh/dsh-chatgpt-subscription"
 case "$DATA_DIR" in
   "$DEFAULT_DATA_DIR"|"$DEFAULT_DATA_DIR"/*) ;;
   *) echo "错误：拒绝删除不在默认插件目录内的 DSH_CHATGPT_DATA_DIR：$DATA_DIR"; exit 1 ;;
@@ -54,13 +60,17 @@ if [[ "$DATA_DIR" == "/" || "$DATA_DIR" == "$HOME" || -z "$DATA_DIR" ]]; then
   echo "错误：拒绝删除危险路径"; exit 1
 fi
 rm -rf -- "$DATA_DIR"
+# 旧包名时代的目录只在用户没自定义 DATA_DIR 时才清（自定义目录永远只删用户指的那一个）
+if [[ -z "${DSH_CHATGPT_DATA_DIR:-}" && -d "$LEGACY_DATA_DIR" ]]; then
+  rm -rf -- "$LEGACY_DATA_DIR"
+fi
 
 echo
 echo "✔ 卸载完成。"
 echo "  ⚠ 运行中的 DeepSeek Harness 把配置/凭据保存在内存里——请重启 DSH 使清理生效。"
 echo "  ~/.codex/auth.json（codex CLI 自己的登录态）已保留，未做任何改动。"
 if [[ "$IS_DESKTOP" == "1" ]]; then
-  echo "  别忘了在客户端「插件」页把 dsh-chatgpt-subscription 也卸载掉。"
+  echo "  别忘了在客户端「插件」页把 dsh-chatgpt-sub 也卸载掉。"
 else
   echo "  下一步：重启 DSH，模型切换器中的 ChatGPT 提供商自动消失。"
 fi

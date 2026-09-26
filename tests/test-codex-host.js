@@ -1,4 +1,4 @@
-// dsh-chatgpt-subscription — host 端纯函数与状态机测试（注入式，零真实网络/零真实 auth.json）
+// dsh-chatgpt-sub — host 端纯函数与状态机测试（注入式，零真实网络/零真实 auth.json）
 // 提取 host.js 模块级常量与纯函数（将「常量 + 纯函数」作为一个共享作用域整体求值，
 // 使函数能解析到同模块内的兄弟函数与常量——如 decodeJwtExp 调 decodeBase64Url、buildAuthorizeUrl 用 OAUTH_SCOPE）
 import { chmodSync, readFileSync, writeFileSync, renameSync, mkdirSync, unlinkSync, rmSync, statSync } from 'node:fs'

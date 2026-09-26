@@ -1,4 +1,4 @@
-// dsh-chatgpt-subscription — 发布链契约（2026-09-24 全自动化补丁）
+// dsh-chatgpt-sub — 发布链契约（2026-09-24 全自动化补丁）
 // 覆盖：
 //   1) release-please / auto-merge 优先使用 AUTOMATION_TOKEN（PAT），未配置时回退
 //      GITHUB_TOKEN —— 默认 token 的 push 不触发 workflow、推的发布分支不被

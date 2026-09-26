@@ -1,4 +1,4 @@
-// dsh-chatgpt-subscription — 安装方式契约（2026-09-24 桌面端客户端发布后新增）
+// dsh-chatgpt-sub — 安装方式契约（2026-09-24 桌面端客户端发布后新增）
 // 覆盖：
 //   1) package.json 只保留 prepublishOnly：pnpm 对 git 依赖会执行并拦截 prepare
 //      （ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED），留着安装期脚本会让插件页
@@ -9,8 +9,8 @@
 //      「插件页添加插件」与命令行两条路径，且代码块里不出现 --profile desktop
 //      （desktop profile 由桌面端客户端独占，CLI 会直接拒绝）
 //   4) install.sh / uninstall.sh 对 desktop profile 有明确拒绝与引导，且语法合法
-//   5) 本仓库不发布 npm：publish-npm.yml 不存在，三处文档都不得给出按包名安装/更新
-//      的命令（包名在 npm 上解析不到，只会报「未找到相关插件」）
+//   5) 本仓库发布 npm（包名 = 仓库名 = dsh-chatgpt-sub）：publish-npm.yml 存在，
+//      三处文档都给出按包名安装/更新的入口（与仓库地址入口并列）
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -53,7 +53,7 @@ assert.notEqual(rowId, rowName, 'the bundle row id must differ from the package 
 
 // ---------- 3. 用户文档三条路径齐全 ----------
 // 用正则匹配完整地址，而不是对 URL 做 substring 断言（CodeQL js/incomplete-url-substring-sanitization）
-const REPO_ADDRESS = /https:\/\/github\.com\/SONGOAO25\/dsh-chatgpt-subscription(?![\w.-])/
+const REPO_ADDRESS = /https:\/\/github\.com\/SONGOAO25\/dsh-chatgpt-sub(?![\w.-])/
 const docs = {
   'README.md': read('README.md'),
   'README.zh-CN.md': read('README.zh-CN.md'),
@@ -93,21 +93,22 @@ assert.notEqual(desktopRun.status, 0, 'install.sh --profile desktop must fail in
 assert.ok(/desktop/.test(desktopRun.stdout + desktopRun.stderr), 'install.sh must name the refused profile')
 assert.ok(/添加插件/.test(desktopRun.stdout + desktopRun.stderr), 'install.sh must send desktop users to the plugin page')
 
-// ---------- 5. 不发布 npm：文档不得引导按包名安装 ----------
-assert.ok(!existsSync(join(root, '.github/workflows/publish-npm.yml')),
-  'this repository does not publish to npm — keep .github/workflows/publish-npm.yml deleted')
+// ---------- 5. 发布 npm：包名与仓库地址是并列的两个安装入口 ----------
+assert.ok(existsSync(join(root, '.github/workflows/publish-npm.yml')),
+  'the package is published to npm — keep .github/workflows/publish-npm.yml present')
+assert.equal(pkg.name, 'dsh-chatgpt-sub', 'the published npm package name is fixed: dsh-chatgpt-sub')
+const PKG_NAME_INSTALL = /add dsh-chatgpt-sub(\s|$)/m
 for (const [name, text] of Object.entries(docs)) {
-  assert.ok(!/dsh-chatgpt-subscription@latest/.test(text),
-    name + ' must not hand users an npm @latest update command')
-  assert.ok(!/dsh plugin --profile \S+ add dsh-chatgpt-subscription(\s|$)/m.test(text),
-    name + ' must not present a bare package-name install command (the package is not on npm)')
+  assert.ok(PKG_NAME_INSTALL.test(text),
+    name + ' must present the bare package-name install command (the package is on npm)')
+  assert.ok(!/dsh-chatgpt-sub@latest/.test(text),
+    name + ' must not hand users an npm @latest install command (DSH takes a plain package name)')
+  // 不许再出现「不发布 npm」的旧说法——那已经和现实相反
+  assert.ok(!/not published to npm|不发布 npm|不在 npm 上|不发布 npm 包/.test(text),
+    name + ' must not claim the plugin is unpublished (it is on npm now)')
 }
-assert.ok(/不发布|没有发布|not published/.test(docs['docs/INSTALL.md']),
-  'docs/INSTALL.md must state that the plugin is not published to npm')
-assert.ok(/not published to npm/.test(docs['README.md']),
-  'README.md must state that the plugin is not published to npm')
-assert.ok(/不发布 npm/.test(docs['README.zh-CN.md']),
-  'README.zh-CN.md must state that the plugin is not published to npm')
+assert.ok(/dsh-chatgpt-sub/.test(docs['docs/INSTALL.md']),
+  'docs/INSTALL.md must name the npm package for the plugin-page install box')
 
 // locale 字典是插件页显示的元信息来源，安装契约测试顺手钉住它没被删
 assert.deepEqual(readdirSync(join(root, 'locale')).sort(), ['en.json', 'zh.json'], 'locale/ must keep the two DSH languages')

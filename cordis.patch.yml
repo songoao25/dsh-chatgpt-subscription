@@ -1,4 +1,4 @@
-# dsh-chatgpt-subscription bundle patch: mounts the plugin into a profile layer stack.
+# dsh-chatgpt-sub bundle patch: mounts the plugin into a profile layer stack.
 # The row id is the key users override in their profile's cordis.patch.yml; the row name
 # is the module this package exports, so it must stay the package name.
 # Keep the two different: DSH's plugin card prints the row id and the module name on
@@ -7,7 +7,7 @@
 # 'agent-team' + '@deepseek-ai/dsh-experimental-agent-team'.
 - insert:
     - id: chatgpt-subscription
-      name: 'dsh-chatgpt-subscription'
+      name: 'dsh-chatgpt-sub'
 
 # This plugin owns only ChatGPT subscription OAuth binding, token upkeep, and the
 # openai-codex model route. It does NOT manage web search: the search provider

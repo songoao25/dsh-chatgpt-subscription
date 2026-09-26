@@ -2,12 +2,12 @@
 
 [**English**](README.md) | **中文**
 
-[![License: MIT](https://img.shields.io/github/license/SONGOAO25/dsh-chatgpt-subscription)](https://github.com/SONGOAO25/dsh-chatgpt-subscription/blob/main/LICENSE)
-[![Release](https://img.shields.io/github/v/release/SONGOAO25/dsh-chatgpt-subscription)](https://github.com/SONGOAO25/dsh-chatgpt-subscription/releases)
-[![CI](https://img.shields.io/github/actions/workflow/status/SONGOAO25/dsh-chatgpt-subscription/ci.yml)](https://github.com/SONGOAO25/dsh-chatgpt-subscription/actions)
-[![Last Commit](https://img.shields.io/github/last-commit/SONGOAO25/dsh-chatgpt-subscription)](https://github.com/SONGOAO25/dsh-chatgpt-subscription)
-[![Stars](https://img.shields.io/github/stars/SONGOAO25/dsh-chatgpt-subscription)](https://github.com/SONGOAO25/dsh-chatgpt-subscription)
-[![Dependabot](https://img.shields.io/badge/dependabot-enabled-025e8c?logo=dependabot)](https://github.com/SONGOAO25/dsh-chatgpt-subscription/security/dependabot)
+[![License: MIT](https://img.shields.io/github/license/SONGOAO25/dsh-chatgpt-sub)](https://github.com/SONGOAO25/dsh-chatgpt-sub/blob/main/LICENSE)
+[![Release](https://img.shields.io/github/v/release/SONGOAO25/dsh-chatgpt-sub)](https://github.com/SONGOAO25/dsh-chatgpt-sub/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/SONGOAO25/dsh-chatgpt-sub/ci.yml)](https://github.com/SONGOAO25/dsh-chatgpt-sub/actions)
+[![Last Commit](https://img.shields.io/github/last-commit/SONGOAO25/dsh-chatgpt-sub)](https://github.com/SONGOAO25/dsh-chatgpt-sub)
+[![Stars](https://img.shields.io/github/stars/SONGOAO25/dsh-chatgpt-sub)](https://github.com/SONGOAO25/dsh-chatgpt-sub)
+[![Dependabot](https://img.shields.io/badge/dependabot-enabled-025e8c?logo=dependabot)](https://github.com/SONGOAO25/dsh-chatgpt-sub/security/dependabot)
 
 一个 [DeepSeek Harness](https://github.com/deepseek-ai)（DSH）插件：用 OpenAI 官方 OAuth 登录 ChatGPT 账号，之后在 DSH 里使用 ChatGPT 模型，消耗你的 ChatGPT Plus/Pro 订阅额度。
 
@@ -32,15 +32,17 @@
 
 ### 方式一：在 DSH 里装 —— **插件 → 添加插件**（桌面端也用这条）
 
-打开 DSH 的 **插件 → 添加插件**，在「包名或地址」里填入仓库地址：
+打开 DSH 的 **插件 → 添加插件**，在「包名或地址」里填包名（推荐）或仓库地址，二选一：
 
 ```
-https://github.com/SONGOAO25/dsh-chatgpt-subscription
+dsh-chatgpt-sub
 ```
 
-包就在仓库根目录，且 `lib/` 已入库，所以填地址安装**不跑构建、也不会弹「待批准的构建脚本」**。同一个框也接受本仓库工作副本的绝对路径（用于开发）。
+```
+https://github.com/SONGOAO25/dsh-chatgpt-sub
+```
 
-**本插件不发布 npm 包**：那一栏填包名 `dsh-chatgpt-subscription` 只会报「未找到相关插件」，请始终填上面的仓库地址。
+填包名装 npm 上的发布版本；填仓库地址装仓库根——`lib/` 已入库，不跑构建、也不会弹「待批准的构建脚本」。同一个框也接受本仓库工作副本的绝对路径（用于开发）。
 
 **桌面端客户端只能用这条**：DSH 的 `desktop` profile 由客户端自己管理，命令行 `dsh plugin --profile desktop` 会被直接拒绝。
 
@@ -51,11 +53,12 @@ https://github.com/SONGOAO25/dsh-chatgpt-subscription
 用你实际启动的那个 profile（`dsh web` 启动的是 `web`）：
 
 ```bash
-# 跟随仓库默认分支（不跑构建，lib/ 已入库）
-dsh plugin --profile web add https://github.com/SONGOAO25/dsh-chatgpt-subscription
-```
+# npm 发布版本（推荐）
+dsh plugin --profile web add dsh-chatgpt-sub
 
-命令行同样没有包名可填——本插件不发布 npm 包，填包名只会报「未找到相关插件」。
+# 或仓库默认分支（不跑构建，lib/ 已入库）
+dsh plugin --profile web add https://github.com/SONGOAO25/dsh-chatgpt-sub
+```
 
 `--profile desktop` 是被有意拒绝的 —— 那个 profile 归桌面端客户端管，请改用 **插件 → 添加插件**。
 
@@ -64,14 +67,14 @@ dsh plugin --profile web add https://github.com/SONGOAO25/dsh-chatgpt-subscripti
 用于开发，或想跑未发布的代码：
 
 ```bash
-git clone https://github.com/SONGOAO25/dsh-chatgpt-subscription.git
-cd dsh-chatgpt-subscription
+git clone https://github.com/SONGOAO25/dsh-chatgpt-sub.git
+cd dsh-chatgpt-sub
 ./install.sh                # 默认安装到 web profile；可用 --profile <name> 指定
 ```
 
-`link:` 安装跟随你的工作副本，而不是仓库默认分支 —— 更新方式见[更新版本](#更新版本)。
+`link:` 安装跟随你的工作副本，而不是 npm / 仓库默认分支 —— 更新方法见[版本更新](#版本更新)。
 
-> 请用仓库地址安装：本插件不在 npm 上，填包名一定会报**「未找到相关插件」**。
+> 以前用旧地址 `https://github.com/SONGOAO25/dsh-chatgpt-subscription` 装的，不用动：GitHub 会自动跳转到新仓库。想统一到新包名，按上面的包名再装一次即可，绑定数据会自动迁移，不用重新登录。
 
 装好后进入 **插件 → ChatGPT 订阅**。完整的安装 / 更新 / 故障排查见 [docs/INSTALL.md](docs/INSTALL.md)。
 
@@ -84,11 +87,12 @@ cd dsh-chatgpt-subscription
 
 > 若浏览器没有自动打开，页面会以 `window.open` 兜底；请允许 DSH 的弹窗。
 
-## 更新版本
+## 版本更新
 
-| 你的安装方式 | 更新命令 |
+| 你的安装方式 | 更新方法 |
 |---|---|
-| 仓库地址（插件页或命令行） | 再执行一次同样的地址安装，然后重启 DSH |
+| 包名 `dsh-chatgpt-sub`（插件页或命令行） | 再执行一次同样的安装，自动取 npm 最新发布版本，然后重启 DSH |
+| 仓库地址（插件页或命令行） | 再执行一次同样的地址安装，取仓库默认分支最新提交，然后重启 DSH |
 | `link:`（一键脚本或本地代码） | `git -C <仓库> fetch origin && git -C <仓库> merge --ff-only origin/main && node <仓库>/scripts/build.mjs`，然后重启 DSH |
 
 更新是手动的：磁盘上的一切改动都要等你执行命令之后才发生。详见 [docs/INSTALL.md](docs/INSTALL.md#更新)。
@@ -105,7 +109,7 @@ cd dsh-chatgpt-subscription
 桌面端客户端：在 **插件** 页里卸载。命令行：
 
 ```bash
-cd dsh-chatgpt-subscription
+cd dsh-chatgpt-sub
 ./uninstall.sh              # 移除插件及注入的路由/凭据
 ```
 
@@ -114,13 +118,16 @@ cd dsh-chatgpt-subscription
 ## 常见问题
 
 **问：桌面端客户端怎么装？**
-打开 **插件 → 添加插件**，填入 `https://github.com/SONGOAO25/dsh-chatgpt-subscription`。桌面端自己管理 `desktop` profile，`dsh plugin --profile desktop` 会被拒绝——插件页就是入口。
+打开 **插件 → 添加插件**，填包名 `dsh-chatgpt-sub` 或仓库地址。桌面端自己管理 `desktop` profile，`dsh plugin --profile desktop` 会被拒绝——插件页就是入口。
+
+**问：以前用旧名字装的，要动吗？**
+不用。旧地址 `https://github.com/SONGOAO25/dsh-chatgpt-subscription` 会自动跳转到新仓库，已装的继续正常更新。想统一到新包名 `dsh-chatgpt-sub`，再装一次即可；绑定数据存在本机，新版启动时自动迁移，不用重新登录。
 
 **问：安装时提示要批准构建脚本？**
-那是装到的清单里声明了安装期脚本（`prepare` / `prepack`）。本仓库的清单只保留 `prepublishOnly`，所以填最新提交的仓库地址安装**不跑构建、也不需要批准**——重新用最新地址装一次即可。
+那是装到的清单里声明了安装期脚本（`prepare` / `prepack`）。本仓库的清单只保留 `prepublishOnly`，所以无论填包名还是填最新提交的仓库地址，安装都**不跑构建、也不需要批准**。
 
 **问：npm 上有这个包吗？**
-没有。插件只从本仓库分发——安装时填仓库地址（插件页或 `dsh plugin add` 都可以）。`package.json` 里的 `name` 是 DSH 的模块名，不是已发布的 npm 包。
+有，包名 `dsh-chatgpt-sub`，与仓库名一致。插件页和 `dsh plugin add` 填包名或仓库地址都可以。
 
 **问：需要 ChatGPT Plus 订阅吗？**
 需要。插件连接你的 ChatGPT 账号，使用 ChatGPT 模型对话消耗订阅额度（可用模型视套餐而定，如 `gpt-5.3-codex-spark` 需更高套餐）。
